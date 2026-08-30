@@ -1,0 +1,5 @@
+.DS_Store
+node_modules/
+.firebase/
+*.keystore
+web/assets/js/firebase-config.local.js
