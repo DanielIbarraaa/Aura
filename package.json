@@ -1,0 +1,35 @@
+{
+  "name": "aura",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Aura — app de acompañamiento y bienestar emocional (PWA + Android vía Capacitor)",
+  "scripts": {
+    "build:firebase": "esbuild src/firebase-bundle.js --bundle --minify --format=iife --global-name=AuraFB --outfile=www/vendor/aura-firebase.js",
+    "serve": "python3 -m http.server 5173 -d www",
+    "sync": "npx cap sync",
+    "android": "bash tools/build-android.sh",
+    "deploy:web": "firebase deploy --only hosting",
+    "deploy:rules": "firebase deploy --only firestore:rules",
+    "deploy:functions": "firebase deploy --only functions",
+    "emu": "firebase emulators:start",
+    "android:release": "bash tools/build-android.sh release",
+    "abrir": "npx cap open android",
+    "iconos": "python3 tools/make-icons.py && python3 tools/make-mascota.py"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "esbuild": "^0.28.2"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/browser": "^8.0.4",
+    "@capacitor/cli": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.3",
+    "firebase": "^12.18.0"
+  }
+}

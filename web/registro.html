@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dar de alta mi consulta — Aura</title>
+<meta name="description" content="Registro de psicólogos y terapeutas en Aura: da de alta tu cédula profesional y genera el código con el que tus pacientes se vinculan.">
+<meta name="theme-color" content="#6C5CE7">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<link rel="stylesheet" href="assets/css/aura.css">
+<link rel="icon" href="assets/img/favicon-32.png" sizes="32x32" type="image/png">
+</head>
+<body>
+
+<header class="barra">
+  <div class="contenedor barra-in">
+    <a class="marca" href="index.html"><span class="marca-estrella" aria-hidden="true"></span> Aura</a>
+    <nav><a href="ingresar.html">Ya tengo cuenta</a></nav>
+  </div>
+</header>
+
+<div class="auth">
+  <div class="auth-form">
+
+    <!-- ===== Paso 1: cuenta y datos profesionales ===== -->
+    <section id="paso1">
+      <div class="pasos"><div class="paso on"></div><div class="paso"></div></div>
+      <span class="etiqueta">Registro profesional</span>
+      <h1 style="font-size:34px; margin-top:10px;">Da de alta tu consulta</h1>
+      <p class="prosa-sm" style="margin-top:12px; max-width:52ch;">Necesitamos tu cédula profesional para verificar que ejerces. Mientras la revisamos puedes usar el panel; tu perfil aparece en el directorio de la app hasta que quede verificada.</p>
+
+      <div id="alerta1"></div>
+
+      <form id="formRegistro" class="bloque-form" novalidate>
+        <div class="rejilla-form">
+          <div class="campo">
+            <label for="nombre">Nombre completo <span aria-hidden="true">*</span></label>
+            <input type="text" id="nombre" autocomplete="name" required placeholder="Lic. Aurora Valdivia">
+          </div>
+          <div class="campo">
+            <label for="cedula">Cédula profesional <span aria-hidden="true">*</span></label>
+            <input type="text" id="cedula" inputmode="numeric" required placeholder="11482903" maxlength="10">
+            <span class="ayuda">7 a 10 dígitos, como aparece en el Registro Nacional de Profesionistas.</span>
+          </div>
+        </div>
+
+        <div class="rejilla-form">
+          <div class="campo">
+            <label for="especialidad">Especialidad <span aria-hidden="true">*</span></label>
+            <select id="especialidad" required>
+              <option value="">Elige una…</option>
+              <option>Psicología clínica</option>
+              <option>Terapia cognitivo-conductual</option>
+              <option>Terapia dialéctico-conductual (DBT)</option>
+              <option>Psicoterapia psicoanalítica</option>
+              <option>Terapia sistémica y familiar</option>
+              <option>Terapia humanista / Gestalt</option>
+              <option>Neuropsicología</option>
+              <option>Psiquiatría</option>
+              <option>Otra</option>
+            </select>
+          </div>
+          <div class="campo">
+            <label for="institucion">Institución que expidió la cédula</label>
+            <input type="text" id="institucion" placeholder="UNAM, UAA, ITESM…">
+          </div>
+        </div>
+
+        <div class="rejilla-form">
+          <div class="campo">
+            <label for="ciudad">Ciudad</label>
+            <input type="text" id="ciudad" placeholder="Aguascalientes, Ags.">
+          </div>
+          <div class="campo">
+            <label for="modalidad">Modalidad</label>
+            <select id="modalidad">
+              <option>Presencial y en línea</option>
+              <option>Solo presencial</option>
+              <option>Solo en línea</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="rejilla-form">
+          <div class="campo">
+            <label for="whatsapp">WhatsApp de contacto</label>
+            <input type="tel" id="whatsapp" inputmode="tel" placeholder="449 123 4567">
+            <span class="ayuda">Es el número al que tus pacientes escriben desde la app, incluido el botón SOS.</span>
+          </div>
+          <div class="campo">
+            <label for="tarifa">Tarifa por sesión (MXN)</label>
+            <input type="text" id="tarifa" inputmode="numeric" placeholder="600">
+          </div>
+        </div>
+
+        <hr style="border:0; border-top:1px solid var(--linea); margin:6px 0;">
+
+        <div class="rejilla-form">
+          <div class="campo">
+            <label for="email">Correo electrónico <span aria-hidden="true">*</span></label>
+            <input type="email" id="email" autocomplete="email" required placeholder="tu@correo.com">
+          </div>
+          <div class="campo">
+            <label for="pass">Contraseña <span aria-hidden="true">*</span></label>
+            <input type="password" id="pass" autocomplete="new-password" required minlength="8" placeholder="Mínimo 8 caracteres">
+          </div>
+        </div>
+
+        <label style="display:flex; gap:10px; align-items:flex-start; font-size:13.5px; color:var(--tinta-2); line-height:1.5;">
+          <input type="checkbox" id="acepto" required style="width:auto; margin-top:3px;">
+          <span>Confirmo que ejerzo con la cédula que declaro y acepto el <a href="aviso-privacidad.html">aviso de privacidad</a>. Entiendo que Aura no es un servicio de urgencias y que el seguimiento clínico sigue siendo mi responsabilidad.</span>
+        </label>
+
+        <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+          <button class="btn btn-primario btn-lg" type="submit" id="btnCrear">Crear mi cuenta</button>
+          <a class="btn btn-fantasma" href="ingresar.html">Ya tengo cuenta</a>
+        </div>
+      </form>
+
+      <div class="separador">o</div>
+      <button class="btn btn-secundario" id="btnGoogle" style="width:100%">Continuar con Google</button>
+      <p class="ayuda" style="margin-top:10px; text-align:center;">Si entras con Google te pediremos la cédula en el siguiente paso.</p>
+    </section>
+
+    <!-- ===== Paso 2: código generado ===== -->
+    <section id="paso2" class="oculto">
+      <div class="pasos"><div class="paso on"></div><div class="paso on"></div></div>
+      <span class="etiqueta">Listo</span>
+      <h1 style="font-size:34px; margin-top:10px;">Tu código de invitación</h1>
+      <p class="prosa-sm" style="margin-top:12px; max-width:52ch;">Dáselo a cada paciente que quieras seguir. Lo escriben una vez en Ajustes → Mi especialista y, desde ese momento, su evolución aparece en tu panel.</p>
+
+      <div class="codigo-caja" style="margin-top:26px;">
+        <span class="etiqueta">Código</span>
+        <div class="cod" id="codigoGenerado">AUR-••••</div>
+        <button class="btn btn-secundario btn-sm" id="btnCopiar">Copiar código</button>
+      </div>
+
+      <div class="aviso aviso-alerta" style="margin-top:22px;">
+        <span>Tu cédula queda en revisión. Puedes usar el panel desde ya; el perfil público en el directorio de la app se publica cuando la verificación pasa.</span>
+      </div>
+
+      <a class="btn btn-primario btn-lg" href="panel.html" style="margin-top:26px;">Entrar a mi panel</a>
+    </section>
+
+  </div>
+
+  <aside class="auth-lateral">
+    <span class="etiqueta">Cómo funciona</span>
+    <h3 style="margin-top:10px; font-size:19px;">De tu alta a la primera sesión con datos</h3>
+    <ul>
+      <li><span class="n">1</span><span>Te registras con tu cédula y generas un código como <span class="mono">AUR-1148</span>.</span></li>
+      <li><span class="n">2</span><span>Tu paciente lo escribe en la app. Nadie más que tú ve sus métricas.</span></li>
+      <li><span class="n">3</span><span>Su ánimo, adherencia a ejercicios y activaciones del SOS llegan solos a tu panel.</span></li>
+      <li><span class="n">4</span><span>Escribes tus notas de evolución después de cada sesión, en tu espacio privado.</span></li>
+    </ul>
+    <div class="aviso aviso-info" style="margin-top:28px;">
+      <span>Nunca vas a ver el contenido del diario de tu paciente. Está cifrado en su teléfono con un PIN que solo él conoce, y esa decisión es deliberada.</span>
+    </div>
+  </aside>
+</div>
+
+<script type="module" src="assets/js/registro.js"></script>
+</body>
+</html>

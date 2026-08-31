@@ -24,7 +24,13 @@
     diaryEntries: [],
     auroriaMemory: [],
     breathingCycles: 0,
-    bubblesPopped: 0
+    bubblesPopped: 0,
+    tippUses: 0,
+    sensoryUses: 0,
+    sosEvents: [],
+    linkedTherapist: null,
+    aiConsent: false,
+    patientId: null
   });
 
   let state = loadState();
@@ -149,6 +155,7 @@
   /* Mini Análisis Clínico */
   function computeClinicalData() {
     const moods = state.moodLogs.slice(-14);
+    let variance = null;
     let avgMood = 0;
     if (moods.length > 0) {
       avgMood = (moods.reduce((acc, m) => acc + m.value, 0) / moods.length).toFixed(1);
@@ -158,18 +165,20 @@
     if (moods.length >= 3) {
       const vals = moods.map(m => m.value);
       const mean = vals.reduce((a, b) => a + b) / vals.length;
-      const variance = vals.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / vals.length;
+      variance = vals.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / vals.length;
       if (variance < 0.6) stability = "Alta / Regulación Favorable";
       else if (variance < 1.4) stability = "Moderada / Fluctuación Habitual";
       else stability = "Baja / Alta Inestabilidad Reactiva";
     }
 
     const anxietyWords = ["ansiedad", "miedo", "nervios", "pánico", "bloqueo", "evitar", "temblor", "vergüenza", "juzgar"];
+    const termFreq = {};
     let mentionCount = 0;
     state.auroriaMemory.forEach(m => {
       if (m.sender === "me") {
+        const t = m.text.toLowerCase();
         anxietyWords.forEach(w => {
-          if (m.text.toLowerCase().includes(w)) mentionCount++;
+          if (t.includes(w)) { mentionCount++; termFreq[w] = (termFreq[w] || 0) + 1; }
         });
       }
     });
@@ -194,6 +203,28 @@
         summary.textContent = "El reporte clínico se actualiza conforme registras entradas en tu diario y estados de ánimo diarios.";
       }
     }
+
+    // Solo números y conteos: nada de texto del diario ni del chat.
+    return {
+      moodAvg14: moods.length ? Number(avgMood) : null,
+      moodCurve: state.moodLogs.slice(-30),
+      stabilityLabel: stability,
+      stabilityVariance: variance === null ? null : Number(variance.toFixed(3)),
+      clinicalTermFreq: termFreq,
+      clinicalTermTotal: mentionCount,
+      breathingCycles: state.breathingCycles,
+      tippUses: state.tippUses || 0,
+      sensoryUses: state.sensoryUses || 0,
+      bubblesPopped: state.bubblesPopped,
+      diaryEntryCount: state.diaryEntries.length,
+      sosEvents: (state.sosEvents || []).slice(-20),
+      updatedAt: new Date().toISOString()
+    };
+  }
+
+  function pushMetrics(reason) {
+    if (!state.linkedTherapist || !window.AuraSync) return;
+    try { window.AuraSync.publish(computeClinicalData(), reason); } catch (e) { console.warn("[Aura] sync:", e); }
   }
 
   function renderHome() {
@@ -397,22 +428,77 @@
     log.scrollTop = log.scrollHeight;
   }
 
-  function handleAurorIASend(text) {
+  const LOCAL_REPLIES = {
+    crisis: "Comprendo lo abrumador que se siente. La respuesta de alarma del cuerpo siempre tiene un límite de tiempo. Si la intensidad es muy alta, usa el botón SOS: ahí tienes enfriamiento, respiración 4-2-8 y la línea de apoyo.",
+    base: "Te escucho. Poner en palabras lo que pasa ayuda a bajar la sobrecarga. ¿Quieres probar un ejercicio sensorial o la técnica 9-0 en el módulo de Calma?"
+  };
+
+  function localReply(text) {
+    const l = text.toLowerCase();
+    const alarm = ["ansiedad", "miedo", "nervios", "pánico", "panico", "angustia"];
+    return alarm.some(w => l.includes(w)) ? LOCAL_REPLIES.crisis : LOCAL_REPLIES.base;
+  }
+
+  function setTyping(on) {
+    const log = $("#chatLog");
+    if (!log) return;
+    let el = $("#chatTyping");
+    if (on && !el) {
+      el = document.createElement("div");
+      el.className = "bubble bot";
+      el.id = "chatTyping";
+      el.textContent = "…";
+      log.appendChild(el);
+      log.scrollTop = log.scrollHeight;
+    } else if (!on && el) {
+      el.remove();
+    }
+  }
+
+  async function handleAurorIASend(text) {
     if (!text.trim()) return;
     appendBubble("me", text);
     state.auroriaMemory.push({ sender: "me", text });
+    saveState();
 
-    setTimeout(() => {
-      let reply = "Te escucho con atención plena. Expresar tus pensamientos ayuda a rebajar la sobrecarga emocional. ¿Deseas explorar un ejercicio sensorial o la técnica 9-0 en el módulo de Calma?";
-      const l = text.toLowerCase();
-      if (l.includes("ansiedad") || l.includes("miedo") || l.includes("nervios") || l.includes("pánico")) {
-        reply = "Comprendo lo abrumador que se siente. Recuerda que la respuesta fisiológica de alarma siempre tiene un límite de tiempo. Si la intensidad es muy alta, usa el botón SOS.";
-      }
+    // Riesgo inmediato: no lo delegamos a un modelo, se abre el SOS de una vez.
+    if (window.AuraAI && window.AuraAI.isCrisis(text)) {
+      const reply = window.AuraAI.CRISIS_REPLY;
       appendBubble("bot", reply);
       state.auroriaMemory.push({ sender: "bot", text: reply });
       saveState();
+      $("#sosOverlay")?.classList.add("open");
+      runSosBreathe();
+      logSos("mencion_en_chat");
       computeClinicalData();
-    }, 600);
+      return;
+    }
+
+    setTyping(true);
+    let reply;
+    try {
+      if (window.AuraAI && state.aiConsent && navigator.onLine) {
+        reply = await window.AuraAI.reply(state.auroriaMemory.slice(-16), { name: state.name });
+      }
+    } catch (e) {
+      console.warn("[Aura] aurorIA sin conexión al modelo:", e);
+    }
+    setTyping(false);
+    if (!reply) reply = localReply(text);
+
+    appendBubble("bot", reply);
+    state.auroriaMemory.push({ sender: "bot", text: reply });
+    saveState();
+    computeClinicalData();
+    pushMetrics("chat");
+  }
+
+  function logSos(origen) {
+    state.sosEvents = state.sosEvents || [];
+    state.sosEvents.push({ at: new Date().toISOString(), origen });
+    saveState();
+    pushMetrics("sos");
+    if (window.AuraSync && state.linkedTherapist) window.AuraSync.alertSos(origen);
   }
 
   /* Módulo de Calma: Kit de los 5 Sentidos */
@@ -666,6 +752,94 @@
     applyTheme(state.theme);
   }
 
+  /* Respaldo del diario: sale cifrado, entra cifrado. Sin el PIN no se lee. */
+  function backupDiary() {
+    if (!state.diarySalt || !state.diaryCheck) {
+      toast("Primero crea tu PIN y una entrada");
+      return;
+    }
+    const payload = {
+      aura_backup: 1,
+      createdAt: new Date().toISOString(),
+      diarySalt: state.diarySalt,
+      diaryCheck: state.diaryCheck,
+      diaryEntries: state.diaryEntries
+    };
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(payload)], { type: "application/json" }));
+    a.download = `aura_diario_cifrado_${todayKey()}.json`;
+    a.click();
+    toast("Respaldo descargado. Guárdalo junto con tu PIN.");
+  }
+
+  function restoreDiary(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if (data.aura_backup !== 1 || !data.diarySalt || !Array.isArray(data.diaryEntries)) {
+          throw new Error("formato");
+        }
+        if (!confirm(`Este respaldo tiene ${data.diaryEntries.length} entradas y reemplaza tu diario actual. Necesitarás el PIN con el que se creó. ¿Continuar?`)) return;
+        state.diarySalt = data.diarySalt;
+        state.diaryCheck = data.diaryCheck;
+        state.diaryEntries = data.diaryEntries;
+        diaryKey = null;
+        diaryUnlocked = false;
+        pinBuffer = "";
+        saveState();
+        renderDiary();
+        showScreen("diario");
+        toast("Respaldo restaurado. Ingresa el PIN de ese respaldo.");
+      } catch {
+        toast("Ese archivo no es un respaldo de Aura");
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function renderLink() {
+    const linked = state.linkedTherapist;
+    $("#linkedView")?.classList.toggle("hidden", !linked);
+    const form = $("#linkForm");
+    if (form) form.style.display = linked ? "none" : "flex";
+    if (linked) {
+      const nm = $("#linkedName");
+      const cd = $("#linkedCode");
+      if (nm) nm.textContent = linked.name || "Especialista vinculado";
+      if (cd) cd.textContent = linked.code;
+    }
+    const hint = $("#linkHint");
+    if (hint && !linked) hint.textContent = "";
+    const sw = $("#aiConsentSwitch");
+    if (sw) sw.classList.toggle("on", !!state.aiConsent);
+  }
+
+  async function linkTherapist() {
+    const input = $("#linkCodeInput");
+    const hint = $("#linkHint");
+    const code = (input?.value || "").trim().toUpperCase();
+    if (!/^AUR-[A-Z0-9]{4}$/.test(code)) {
+      if (hint) { hint.className = "link-err"; hint.textContent = "El código va como AUR-1148."; }
+      return;
+    }
+    if (!window.AuraSync) {
+      if (hint) { hint.className = "link-err"; hint.textContent = "Sincronización no configurada todavía."; }
+      return;
+    }
+    if (hint) { hint.className = ""; hint.textContent = "Verificando…"; }
+    try {
+      const t = await window.AuraSync.link(code);
+      state.linkedTherapist = t;
+      saveState();
+      renderLink();
+      if (hint) { hint.className = "link-ok"; hint.textContent = "Vinculado. A partir de ahora se comparten métricas, nunca tu diario."; }
+      pushMetrics("vinculacion");
+    } catch (e) {
+      if (hint) { hint.className = "link-err"; hint.textContent = e && e.message ? e.message : "No encontramos ese código."; }
+    }
+  }
+
   /* Init Global */
   document.addEventListener("DOMContentLoaded", () => {
     applyTheme(state.theme);
@@ -805,6 +979,73 @@
       }
     });
 
+    // Service worker: sin esto no hay instalación ni caché offline
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js").catch(e => console.warn("[Aura] SW:", e));
+    }
+
+    // Botón del modal SOS que antes tronaba con ReferenceError
+    $("#sosToSpecialists")?.addEventListener("click", () => {
+      $("#sosOverlay")?.classList.remove("open");
+      stopSosBreathe();
+      showScreen("especialistas");
+    });
+
+    // Enlaces que deben salir del WebView (marcador y WhatsApp)
+    $all("[data-tel]").forEach(b => b.addEventListener("click", () => {
+      const num = b.dataset.tel;
+      logSos("llamada_linea");
+      if (window.Capacitor?.Plugins?.App) window.Capacitor.Plugins.App.openUrl({ url: `tel:${num}` });
+      else window.location.href = `tel:${num}`;
+    }));
+    $all("[data-external]").forEach(b => b.addEventListener("click", () => {
+      const url = b.dataset.external;
+      if (window.Capacitor?.Plugins?.Browser) window.Capacitor.Plugins.Browser.open({ url });
+      else window.open(url, "_blank", "noopener");
+    }));
+
+    // Respaldo cifrado
+    $("#backupBtn")?.addEventListener("click", backupDiary);
+    $("#restoreBtn")?.addEventListener("click", () => $("#restoreFile")?.click());
+    $("#restoreFile")?.addEventListener("change", (e) => {
+      const f = e.target.files?.[0];
+      if (f) restoreDiary(f);
+      e.target.value = "";
+    });
+
+    // Vinculación con especialista
+    $("#btnLink")?.addEventListener("click", linkTherapist);
+    $("#linkCodeInput")?.addEventListener("keydown", (e) => { if (e.key === "Enter") linkTherapist(); });
+    $("#btnUnlink")?.addEventListener("click", () => {
+      if (!confirm("¿Dejar de compartir métricas con tu especialista?")) return;
+      window.AuraSync?.unlink(state.linkedTherapist);
+      state.linkedTherapist = null;
+      saveState();
+      renderLink();
+      toast("Desvinculado");
+    });
+
+    // Consentimiento del modelo en la nube
+    $("#aiConsentSwitch")?.addEventListener("click", () => {
+      state.aiConsent = !state.aiConsent;
+      saveState();
+      renderLink();
+      toast(state.aiConsent ? "aurorIA usará el modelo en la nube" : "aurorIA responderá solo con guiones locales");
+    });
+
+    // Contadores de adherencia para el expediente
+    $all(".sense-tab-btn").forEach(b => b.addEventListener("click", () => {
+      state.sensoryUses = (state.sensoryUses || 0) + 1; saveState();
+    }));
+    $all("[data-tipp]").forEach(b => b.addEventListener("click", () => {
+      state.tippUses = (state.tippUses || 0) + 1; saveState(); pushMetrics("tipp");
+    }));
+
+    // El SOS abierto a mano también queda en el expediente
+    $("#tabbarSosBtn")?.addEventListener("click", () => logSos("boton_sos"));
+
+    if (window.AuraSync) window.AuraSync.init(state);
+    renderLink();
     renderHome();
   });
 })();

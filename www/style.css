@@ -161,12 +161,15 @@ button { cursor: pointer; border: none; background: none; }
 /* Topbar */
 .topbar { position: sticky; top: 0; z-index: 60; padding-top: calc(14px + var(--safe-t)); padding-bottom: 6px; }
 .topbar-inner { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; }
-.brand { display: flex; align-items: center; gap: 10px; }
+.brand { display: flex; align-items: center; gap: 13px; }
 .brand-mark {
-  width: 32px; height: 32px; border-radius: 50%;
-  border: 3.5px solid var(--c-purple-shadow);
-  background: radial-gradient(circle, var(--c-cyan-bright) 25%, var(--c-lavender-light) 75%);
+  width: 30px; height: 30px; flex: none;
+  /* iconstar.png, la estrella de la marca, como máscara para que tome color */
+  background: var(--c-purple-shadow);
+  -webkit-mask: url(assets/iconstar.png) center / contain no-repeat;
+  mask: url(assets/iconstar.png) center / contain no-repeat;
 }
+[data-theme="dark"] .brand-mark { background: #FFFFFF; }
 .brand-name { font-weight: 800; font-size: 18px; letter-spacing: -0.01em; color: var(--text); }
 .desktop-nav { display: none; align-items: center; gap: 6px; }
 @media (min-width: 980px) { .desktop-nav { display: flex; } }
@@ -399,3 +402,42 @@ button { cursor: pointer; border: none; background: none; }
 .toast-wrap { position: fixed; top: calc(16px + var(--safe-t)); left: 50%; transform: translateX(-50%); z-index: 300; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
 .toast { display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: var(--radius-pill); font-size: 13px; font-weight: 600; background: var(--bg-1); color: var(--text); border: 1px solid var(--c-lavender-base); box-shadow: var(--glass-shadow); }
 .hidden { display: none !important; }
+/* ===== Añadidos: vinculación con especialista, avisos y respaldo ===== */
+.demo-banner {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--c-purple-shadow);
+  background: rgba(216, 212, 251, 0.38);
+  border: 1px solid var(--glass-border);
+}
+.linked-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(216, 212, 251, 0.32);
+  border: 1px solid var(--glass-border);
+}
+.mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace; letter-spacing: .04em; }
+.link-ok { color: #2E8B6B; }
+.link-err { color: #D65A7A; }
+.sync-dot {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: #C9C4DE; margin-right: 6px; vertical-align: middle;
+}
+.sync-dot.on { background: #2E8B6B; }
+.sync-dot.off { background: #D6A45A; }
+
+/* aurorIA, la mascota, en la pantalla del chat */
+.auroria-avatar {
+  width: 52px; height: 52px; flex: none; border-radius: 50%;
+  object-fit: contain; padding: 1px;
+  background: radial-gradient(circle at 50% 40%, rgba(216,212,251,.9), rgba(216,212,251,.35));
+  border: 1px solid var(--glass-border);
+}
+.bubble.bot { position: relative; }

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Aura — Acompañamiento y Calma</title>
 <meta name="description" content="Aura: aurorIA, diario emocional cifrado, red de especialistas con cédula profesional, módulo de calma con habilidades TIPP y botón de emergencia SOS.">
 <meta name="theme-color" content="#F3F1FA">
@@ -10,6 +10,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Aura">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -227,10 +235,13 @@
 
   <!-- ================= 3. AURORIA ================= -->
   <section class="screen" id="screen-auroria">
-    <div class="section-head" style="display:flex; justify-content:space-between; align-items:center;">
-      <div>
-        <h2>aurorIA</h2>
-        <p>Acompañamiento empático con memoria contextual.</p>
+    <div class="section-head" style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <img class="auroria-avatar" src="assets/aurorIA-avatar.png" alt="" width="52" height="52">
+        <div>
+          <h2>aurorIA</h2>
+          <p>Acompañamiento empático con memoria contextual.</p>
+        </div>
       </div>
       <button class="glass-btn sm" id="clearMemoryBtn"><svg class="icon icon-sm"><use href="#i-trash"/></svg>Reiniciar</button>
     </div>
@@ -261,19 +272,19 @@
         <p>Técnicas basadas en terapia dialéctico-conductual para frenar picos de adrenalina.</p>
       </div>
       <div class="grid-2">
-        <div class="tipp-card">
+        <div class="tipp-card" data-tipp tabindex="0" role="button">
           <strong>T - Temperatura</strong>
           <p>Lava tu rostro con agua muy fría o sostén cubos de hielo. Activa el reflejo de inmersión y disminuye el pulso cardíaco en segundos.</p>
         </div>
-        <div class="tipp-card">
+        <div class="tipp-card" data-tipp tabindex="0" role="button">
           <strong>I - Intensidad Física</strong>
           <p>Realiza 1 minuto de saltos de tijera o sentadillas para quemar el exceso de glucosa y adrenalina liberado por la alarma de ansiedad.</p>
         </div>
-        <div class="tipp-card">
+        <div class="tipp-card" data-tipp tabindex="0" role="button">
           <strong>P - Pausa en Respiración</strong>
           <p>Inhala profundo y haz que tu exhalación sea el doble de larga que tu inhalación para activar el sistema parasimpático.</p>
         </div>
-        <div class="tipp-card">
+        <div class="tipp-card" data-tipp tabindex="0" role="button">
           <strong>P - Pareo Muscular</strong>
           <p>Tensa fuertemente un grupo muscular (puños u hombros) por 5 segundos y suelta abruptamente sintiendo la distensión.</p>
         </div>
@@ -380,6 +391,7 @@
     <div class="section-head">
       <h2>Red de Especialistas</h2>
       <p>Terapeutas y psicólogos con cédula profesional verificada para acompañamiento clínico.</p>
+      <div class="demo-banner" id="specialistsDemoBanner">Catálogo de demostración. Los perfiles y cédulas que ves abajo son de ejemplo y se reemplazan por especialistas reales dados de alta en la plataforma web.</div>
     </div>
 
     <div class="grid-2">
@@ -387,7 +399,7 @@
         <div>
           <div class="psy-header">
             <div class="psy-avatar-circle">
-              <img src="assets/psicologa-aurora.jpg" alt="Lic. Aurora Valdivia" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='icon-192.png'">
+              <img src="assets/psicologa-aurora.jpg" alt="Lic. Aurora Valdivia" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null;this.src='icons/maskable-192.png'">
             </div>
             <div>
               <h3 style="font-size:16.5px;">Lic. Aurora Valdivia</h3>
@@ -407,7 +419,7 @@
           </div>
         </div>
         <div style="display:flex; flex-direction:column; gap:8px;">
-          <button class="glass-btn primary block" onclick="window.open('https://wa.me/524491234567?text=Hola%20Lic.%20Aurora,%20vengo%20desde%20la%20app%20Aura%20y%20me%20gustaría%20agendar%20una%20sesión.','_blank')">
+          <button class="glass-btn primary block" data-external="https://wa.me/524491234567?text=Hola%20Lic.%20Aurora,%20vengo%20desde%20la%20app%20Aura%20y%20me%20gustaría%20agendar%20una%20sesión.">
             <svg class="icon icon-sm"><use href="#i-message-circle"/></svg>Contactar por WhatsApp
           </button>
         </div>
@@ -434,7 +446,7 @@
           </div>
         </div>
         <div style="display:flex; flex-direction:column; gap:8px;">
-          <button class="glass-btn primary block" onclick="window.open('https://wa.me/524497654321?text=Hola%20Psic.%20Roberto,%20vengo%20desde%20la%20app%20Aura%20y%20me%20gustaría%20agendar%20una%20sesión.','_blank')">
+          <button class="glass-btn primary block" data-external="https://wa.me/524497654321?text=Hola%20Psic.%20Roberto,%20vengo%20desde%20la%20app%20Aura%20y%20me%20gustaría%20agendar%20una%20sesión.">
             <svg class="icon icon-sm"><use href="#i-message-circle"/></svg>Contactar por WhatsApp
           </button>
         </div>
@@ -493,6 +505,45 @@
         </div>
         <button class="glass-btn primary sm" id="saveProfileBtn" style="align-self:flex-start; margin-top:6px;">Guardar perfil</button>
       </div>
+    </div>
+
+    <div class="card glass">
+      <div class="settings-row">
+        <div>
+          <strong>aurorIA con modelo en la nube</strong>
+          <p style="font-size:12px; color:var(--text-soft); max-width:38ch;">Activa respuestas generadas por IA. Lo que escribas en el chat se envía a Google para generar la respuesta. Tu diario nunca se envía. Apagado, aurorIA responde con guiones locales y funciona sin señal.</p>
+        </div>
+        <div class="switch" id="aiConsentSwitch"></div>
+      </div>
+    </div>
+
+    <div class="card glass">
+      <h3 style="font-size:15px; margin-bottom:6px;">Mi especialista</h3>
+      <p style="font-size:12px; color:var(--text-soft); margin-bottom:12px;">Si tu terapeuta te dio un código, escríbelo aquí. Solo se comparten métricas: tu diario nunca sale del teléfono.</p>
+      <div id="linkedView" class="hidden linked-box">
+        <div>
+          <strong id="linkedName" style="font-size:14px; display:block;"></strong>
+          <span class="mono" id="linkedCode" style="font-size:12px; color:var(--text-soft);"></span>
+        </div>
+        <button class="glass-btn sm" id="btnUnlink">Desvincular</button>
+      </div>
+      <div id="linkForm" style="display:flex; gap:8px;">
+        <input type="text" id="linkCodeInput" class="input-field" placeholder="AUR-0000" maxlength="8" autocapitalize="characters" style="flex:1;">
+        <button class="glass-btn primary sm" id="btnLink">Vincular</button>
+      </div>
+      <p id="linkHint" style="font-size:11.5px; color:var(--text-soft); margin-top:8px;"></p>
+    </div>
+
+    <div class="card glass">
+      <div class="settings-row" style="cursor:pointer;" id="backupBtn">
+        <div><strong>Respaldar diario cifrado</strong><p style="font-size:12px; color:var(--text-soft);">Descarga tus entradas tal cual, cifradas. Sin tu PIN nadie puede leerlas — tú incluido.</p></div>
+        <svg class="icon icon-sm"><use href="#i-lock"/></svg>
+      </div>
+      <div class="settings-row" style="cursor:pointer;" id="restoreBtn">
+        <div><strong>Restaurar respaldo</strong><p style="font-size:12px; color:var(--text-soft);">Recupera un respaldo previo con el mismo PIN</p></div>
+        <svg class="icon icon-sm"><use href="#i-book"/></svg>
+      </div>
+      <input type="file" id="restoreFile" accept="application/json" class="hidden">
     </div>
 
     <div class="card glass">
@@ -568,10 +619,10 @@
 
     <!-- Bloque 4: Puente Directo con Profesionales -->
     <div class="sos-actions" style="margin-top:16px; display:flex; flex-direction:column; gap:10px;">
-      <button class="glass-btn primary block" onclick="window.location.href='tel:8009112000'">
+      <button class="glass-btn primary block" data-tel="8009112000">
         <svg class="icon icon-sm"><use href="#i-phone"/></svg>Llamar a Línea de la Vida (24/7 Oficial)
       </button>
-      <button class="glass-btn block" onclick="showScreen('especialistas'); $('#sosOverlay').classList.remove('open');">
+      <button class="glass-btn block" id="sosToSpecialists">
         <svg class="icon icon-sm"><use href="#i-message-circle"/></svg>WhatsApp a mi Especialista
       </button>
       <p style="font-size:11px; color:var(--text-soft); text-align:center; margin-top:4px;">
@@ -582,6 +633,9 @@
 </div>
 
 <div class="toast-wrap" id="toastWrap"></div>
+<script src="js/aura-config.js"></script>
+<script src="js/aura-ai.js"></script>
+<script src="js/aura-sync.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel clínico — Aura</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#6C5CE7">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<link rel="stylesheet" href="assets/css/aura.css">
+<link rel="icon" href="assets/img/favicon-32.png" sizes="32x32" type="image/png">
+</head>
+<body>
+
+<header class="barra">
+  <div class="contenedor barra-in" style="max-width:none">
+    <a class="marca" href="index.html"><span class="marca-estrella" aria-hidden="true"></span> Aura</a>
+    <nav>
+      <span class="pastilla p-neutro" id="miCodigo" title="Tu código de invitación">AUR-••••</span>
+      <span id="miNombre" style="font-size:14px; color:var(--tinta-2);"></span>
+      <button class="btn btn-fantasma btn-sm" id="btnSalir">Salir</button>
+    </nav>
+  </div>
+</header>
+
+<div class="panel">
+
+  <aside class="panel-lista">
+    <h2>Pacientes activos</h2>
+    <div id="listaPacientes"></div>
+    <div id="listaVacia" class="oculto" style="padding:16px 10px; font-size:13.5px; color:var(--tinta-3); line-height:1.55;">
+      Todavía nadie se ha vinculado. Comparte tu código <b class="mono" id="codigoInline">AUR-••••</b> con un paciente: lo escribe una vez en Ajustes → Mi especialista.
+    </div>
+  </aside>
+
+  <main class="panel-cuerpo" id="cuerpo">
+    <div class="vacio" id="sinSeleccion">
+      <h3>Elige un paciente</h3>
+      <p>Su expediente se actualiza solo, en cuanto registra su ánimo o usa una técnica.</p>
+    </div>
+
+    <div id="expediente" class="oculto">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:20px; flex-wrap:wrap;">
+        <div>
+          <span class="etiqueta">Mini análisis clínico</span>
+          <h1 style="font-size:29px; margin-top:8px;" id="pacNombre">—</h1>
+          <p style="font-size:13.5px; color:var(--tinta-3); margin-top:6px;">
+            Vinculado con <span class="mono" id="pacCodigo">—</span> · última actividad <span id="pacVisto">—</span>
+          </p>
+        </div>
+        <button class="btn btn-secundario btn-sm" id="btnRenombrar">Poner nombre</button>
+      </div>
+
+      <div class="aviso aviso-info" style="margin-top:20px;" id="avisoSos"></div>
+
+      <div class="tiles" id="tiles"></div>
+
+      <div class="grafica-caja">
+        <div class="grafica-cab">
+          <h3>Estado de ánimo diario, del 1 al 5</h3>
+          <div class="rango" role="group" aria-label="Rango de días">
+            <button data-dias="14" aria-pressed="true">14 días</button>
+            <button data-dias="30" aria-pressed="false">30 días</button>
+            <button id="btnTabla" aria-pressed="false" title="Ver los mismos datos como tabla">Tabla</button>
+          </div>
+        </div>
+        <div id="grafica"></div>
+        <div id="tooltip" role="status"></div>
+        <div id="tablaAnimo" class="oculto"></div>
+      </div>
+
+      <div class="bloque-panel">
+        <h3>Términos clínicos verbalizados con aurorIA</h3>
+        <p style="font-size:13.5px; color:var(--tinta-3); max-width:64ch;">Conteo de apariciones, calculado en el teléfono del paciente. El texto de las conversaciones no sale de su dispositivo.</p>
+        <div class="terminos" id="terminos"></div>
+      </div>
+
+      <div class="bloque-panel">
+        <h3>Historial de activaciones del SOS</h3>
+        <div class="linea-tiempo" id="sosLista"></div>
+      </div>
+
+      <div class="bloque-panel">
+        <h3>Notas de evolución</h3>
+        <p style="font-size:13.5px; color:var(--tinta-3); max-width:64ch; margin-bottom:14px;">Privadas. El paciente no las ve desde la app.</p>
+        <form id="formNota" style="display:flex; flex-direction:column; gap:12px; margin-bottom:22px;">
+          <label class="sr" for="notaTexto">Nueva nota de evolución</label>
+          <textarea id="notaTexto" placeholder="Qué se trabajó en sesión, qué se acordó, qué observar la próxima vez…"></textarea>
+          <button class="btn btn-primario" type="submit" style="align-self:flex-start">Guardar nota</button>
+        </form>
+        <div id="notas"></div>
+      </div>
+
+      <p class="legal" style="margin-top:44px">Estas métricas son un apoyo para la consulta, no un instrumento diagnóstico ni un sistema de monitoreo en tiempo real. Aura no atiende urgencias: si un paciente está en riesgo, actúa por tus canales clínicos habituales.</p>
+    </div>
+  </main>
+</div>
+
+<script type="module" src="assets/js/panel.js"></script>
+</body>
+</html>

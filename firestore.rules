@@ -1,0 +1,110 @@
+rules_version = '2';
+
+// =========================================================
+// AURA — reglas de Firestore
+// La promesa de la app ("tu terapeuta ve la curva, nunca el texto")
+// se sostiene en dos cosas: que el diario nunca se sube, y en estas
+// reglas. Si alguna vez las relajas, la promesa deja de ser cierta.
+// =========================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function autenticado() { return request.auth != null; }
+    function esUno(uid)    { return autenticado() && request.auth.uid == uid; }
+
+    function terapeutaDe(pid) {
+      return autenticado() &&
+        get(/databases/$(database)/documents/patients/$(pid)).data.therapistUid == request.auth.uid;
+    }
+
+    function soloCambian(campos) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(campos);
+    }
+
+    // ---------- Perfil del especialista ----------
+    match /therapists/{uid} {
+      allow get: if esUno(uid);
+      allow list: if false;
+
+      allow create: if esUno(uid)
+                    && request.resource.data.verified == false          // nadie nace verificado
+                    && request.resource.data.cedula is string
+                    && request.resource.data.cedula.matches('^[0-9]{7,10}$')
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() >= 4;
+
+      // Puede editar su perfil, pero jamás su propio estado de verificación.
+      allow update: if esUno(uid)
+                    && request.resource.data.verified == resource.data.verified;
+      allow delete: if false;
+    }
+
+    // ---------- Índice de códigos de invitación ----------
+    // Un paciente necesita resolver AUR-XXXX -> terapeuta. Por eso get() es
+    // abierto a usuarios autenticados, pero list() no: nadie barre la colección.
+    match /codes/{code} {
+      allow get: if autenticado();
+      allow list: if false;
+
+      // create falla solo si el código ya existe: así una colisión no le roba
+      // el código a otro terapeuta.
+      allow create: if autenticado()
+                    && request.resource.data.therapistUid == request.auth.uid
+                    && request.resource.data.active == true;
+      allow update: if autenticado() && resource.data.therapistUid == request.auth.uid;
+      allow delete: if false;
+    }
+
+    // ---------- Vínculo paciente-terapeuta ----------
+    match /patients/{pid} {
+      allow read: if esUno(pid)
+                  || (autenticado() && resource.data.therapistUid == request.auth.uid);
+
+      allow create: if esUno(pid);
+
+      // El paciente controla su vínculo; el terapeuta solo puede ponerle alias.
+      allow update: if esUno(pid)
+                    || (autenticado()
+                        && resource.data.therapistUid == request.auth.uid
+                        && soloCambian(['alias']));
+      allow delete: if esUno(pid);
+
+      // ---------- Métricas: números, nunca texto ----------
+      match /metrics/{doc} {
+        allow read:  if esUno(pid) || terapeutaDe(pid);
+        allow write: if esUno(pid);   // solo el propio dispositivo publica
+      }
+
+      // ---------- Notas de evolución: del terapeuta, privadas ----------
+      // El paciente NO entra aquí, ni siquiera a leer.
+      match /notes/{noteId} {
+        allow read, create, update, delete: if terapeutaDe(pid);
+      }
+    }
+
+    // ---------- Alertas de SOS ----------
+    match /alerts/{id} {
+      allow create: if autenticado()
+                    && request.resource.data.patientId == request.auth.uid
+                    && request.resource.data.therapistUid ==
+                       get(/databases/$(database)/documents/patients/$(request.auth.uid)).data.therapistUid;
+      allow get, list: if autenticado() && resource.data.therapistUid == request.auth.uid;
+      allow update:    if autenticado() && resource.data.therapistUid == request.auth.uid
+                       && soloCambian(['read', 'readAt']);
+      allow delete: if false;
+    }
+
+    // ---------- Directorio público de la app ----------
+    // Lo escribe únicamente la Cloud Function cuando una cédula queda
+    // verificada, y solo lleva los campos que el paciente puede ver.
+    match /directory/{uid} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Todo lo demás queda cerrado.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

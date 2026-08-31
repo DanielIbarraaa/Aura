@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ingresar — Aura</title>
+<meta name="description" content="Entra a tu panel clínico de Aura.">
+<meta name="theme-color" content="#6C5CE7">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<link rel="stylesheet" href="assets/css/aura.css">
+<link rel="icon" href="assets/img/favicon-32.png" sizes="32x32" type="image/png">
+</head>
+<body>
+
+<header class="barra">
+  <div class="contenedor barra-in">
+    <a class="marca" href="index.html"><span class="marca-estrella" aria-hidden="true"></span> Aura</a>
+    <nav><a href="registro.html">Crear cuenta</a></nav>
+  </div>
+</header>
+
+<div class="auth">
+  <div class="auth-form" style="max-width:460px">
+    <span class="etiqueta">Panel clínico</span>
+    <h1 style="font-size:34px; margin-top:10px;">Ingresa a tu panel</h1>
+    <p class="prosa-sm" style="margin-top:12px;">Solo para especialistas dados de alta. Tus pacientes entran desde la app, no desde aquí.</p>
+
+    <div id="alerta"></div>
+
+    <form id="formLogin" class="bloque-form" novalidate>
+      <div class="campo">
+        <label for="email">Correo electrónico</label>
+        <input type="email" id="email" autocomplete="email" required placeholder="tu@correo.com">
+      </div>
+      <div class="campo">
+        <label for="pass">Contraseña</label>
+        <input type="password" id="pass" autocomplete="current-password" required>
+      </div>
+      <button class="btn btn-primario btn-lg" type="submit" id="btnEntrar">Entrar</button>
+      <button type="button" class="btn btn-fantasma btn-sm" id="btnReset" style="align-self:flex-start">Olvidé mi contraseña</button>
+    </form>
+
+    <div class="separador">o</div>
+    <button class="btn btn-secundario" id="btnGoogle" style="width:100%">Continuar con Google</button>
+
+    <p class="ayuda" style="margin-top:26px;">¿Aún no tienes cuenta? <a href="registro.html">Da de alta tu consulta</a>.</p>
+  </div>
+
+  <aside class="auth-lateral">
+    <span class="etiqueta">Recordatorio</span>
+    <h3 style="margin-top:10px; font-size:19px;">Lo que vas a ver, y lo que no</h3>
+    <ul>
+      <li><span class="n">✓</span><span>Curva de ánimo, estabilidad, adherencia a ejercicios y activaciones del SOS.</span></li>
+      <li><span class="n">✓</span><span>Tus notas de evolución, privadas.</span></li>
+      <li><span class="n">✕</span><span>El contenido del diario. Está cifrado en el teléfono del paciente y no existe forma de leerlo desde aquí.</span></li>
+      <li><span class="n">✕</span><span>Sus conversaciones con aurorIA. Solo cuentas de menciones.</span></li>
+    </ul>
+  </aside>
+</div>
+
+<script type="module" src="assets/js/ingresar.js"></script>
+</body>
+</html>
