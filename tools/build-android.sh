@@ -58,6 +58,28 @@ if [ ! -d node_modules/@capacitor/assets ]; then
   npm install --silent -D @capacitor/assets
 fi
 
+# ---------- 1.5 Google nativo, solo si ya hay google-services.json ----------
+# El plugin arrastra el Google Services Gradle plugin, que sin ese archivo
+# rompe la compilación. Por eso va condicionado y no por defecto.
+if [ -f google-services.json ] && [ ! -f android/app/google-services.json ]; then
+  mkdir -p android/app 2>/dev/null || true
+  cp google-services.json android/app/google-services.json 2>/dev/null || true
+fi
+if [ -f android/app/google-services.json ]; then
+  if [ ! -d node_modules/@capacitor-firebase/authentication ]; then
+    azul "Instalando el login nativo de Google"
+    npm install --silent @capacitor-firebase/authentication firebase
+  fi
+  bien "google-services.json detectado — Google nativo habilitado"
+else
+  printf "\033[1;33m! Falta android/app/google-services.json\033[0m\n"
+  echo "  Sin él, el botón de Google en el teléfono no funciona y hay que entrar"
+  echo "  como invitado (que sí es una cuenta real, anónima, en Firebase)."
+  echo "  Bájalo de Firebase Console → Configuración del proyecto → Tus apps → Android,"
+  echo "  déjalo en la raíz del proyecto y vuelve a correr esto."
+  echo
+fi
+
 # ---------- 2. El bundle de Firebase ----------
 azul "Compilando el SDK de Firebase"
 npm run build:firebase

@@ -16,3 +16,7 @@ android/.cxx/
 .vscode/
 .DS_Store
 _to_delete/
+
+# Config de Firebase para Android: contiene identificadores del proyecto
+# (no son secretos, pero mejor decidir tú si se versiona)
+# google-services.json

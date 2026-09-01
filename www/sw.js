@@ -4,7 +4,7 @@
 const CACHE = 'aura-v4';
 const ASSETS = [
   './', './index.html', './style.css', './app.js', './manifest.json',
-  './js/aura-config.js', './js/aura-ai.js', './js/aura-sync.js',
+  './js/aura-config.js', './js/aura-auth.js', './js/aura-ai.js', './js/aura-sync.js',
   './vendor/aura-firebase.js',
   './icon-192.png', './icon-512.png', './favicon-32.png',
   './icons/maskable-192.png', './icons/maskable-512.png', './icons/apple-touch-icon.png',

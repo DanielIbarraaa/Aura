@@ -87,52 +87,111 @@
     applyTheme(state.theme);
   }
 
-  /* Autenticación Mockup */
+  /* Autenticación real (Firebase Auth) con respaldo local */
+  function pintarSesion() {
+    const u = window.AuraAuth?.usuario;
+    const correo = $("#userSessionEmail");
+    const estado = $("#userSessionStatus");
+    if (correo) correo.textContent = u?.email || state.name || "Cuenta conectada";
+    if (estado) {
+      estado.textContent = !u ? "Sin sesión"
+        : u.proveedor === "local" ? "Sesión local, sin sincronizar"
+        : u.anonimo ? "Invitado · los datos viven en este teléfono"
+        : "Sesión con Google";
+    }
+  }
+
+  function cerrarOverlay() {
+    $("#authOverlay")?.classList.add("hidden");
+    renderHome();
+    renderSettings();
+    renderLink();
+    pintarSesion();
+  }
+
+  function errorAuth(e) {
+    const m = String(e?.code || e?.message || e);
+    if (m.includes("popup-closed") || m.includes("cancelled")) return "Cerraste la ventana de Google.";
+    if (m.includes("popup-blocked")) return "El navegador bloqueó la ventana. Permite las emergentes e inténtalo de nuevo.";
+    if (m.includes("network")) return "Sin conexión. Puedes entrar como invitado.";
+    if (m.includes("operation-not-allowed")) return "Falta activar Google en Firebase → Authentication.";
+    if (m.includes("plugin nativo")) return "Google todavía no está listo en Android. Entra como invitado.";
+    if (m.includes("no está configurado")) return "Firebase aún no está configurado. Entra como invitado.";
+    return "No se pudo entrar. Inténtalo otra vez.";
+  }
+
   function initAuth() {
     const authOverlay = $("#authOverlay");
     if (!authOverlay) return;
 
-    if (!state.isLoggedIn) {
-      authOverlay.classList.remove("hidden");
-    } else {
-      authOverlay.classList.add("hidden");
-    }
+    authOverlay.classList.toggle("hidden", !!state.isLoggedIn);
 
-    $("#googleLoginBtn")?.addEventListener("click", () => {
-      toast("Conectando con Google...");
-      setTimeout(() => {
+    // Si Firebase ya tiene sesión de una apertura anterior, se respeta.
+    window.AuraAuth?.alCambiar((u) => {
+      if (u) {
         state.isLoggedIn = true;
-        if (!state.name) state.name = "Alondra Alfaro";
-        if (!state.email) state.email = "alondra.alfaro@gmail.com";
+        if (u.nombre && !state.name) state.name = u.nombre;
+        if (u.email) state.email = u.email;
+        if (u.uid) state.patientId = u.uid;
         saveState();
-        authOverlay.classList.add("hidden");
-        renderHome();
-        renderSettings();
+        cerrarOverlay();
+      }
+      pintarSesion();
+    });
+    window.AuraAuth?.init();
+
+    const btnG = $("#googleLoginBtn");
+    btnG?.addEventListener("click", async () => {
+      const txt = btnG.querySelector("span");
+      const antes = txt ? txt.textContent : "";
+      btnG.disabled = true;
+      if (txt) txt.textContent = "Conectando…";
+      try {
+        const u = await window.AuraAuth.entrarConGoogle();
+        state.isLoggedIn = true;
+        state.name = u.nombre || state.name || "";
+        state.email = u.email || state.email || "";
+        state.patientId = u.uid;
+        saveState();
+        cerrarOverlay();
         toast("Sesión iniciada con Google");
-      }, 700);
+      } catch (e) {
+        toast(errorAuth(e));
+      } finally {
+        btnG.disabled = false;
+        if (txt) txt.textContent = antes;
+      }
     });
 
-    $("#guestLoginForm")?.addEventListener("submit", (e) => {
+    $("#guestLoginForm")?.addEventListener("submit", async (e) => {
       e.preventDefault();
-      const guestName = $("#loginGuestName")?.value.trim();
+      const nombre = $("#loginGuestName")?.value.trim();
+      try {
+        const u = await window.AuraAuth.entrarComoInvitado(nombre);
+        state.patientId = u.uid || state.patientId;
+      } catch (err) {
+        console.warn("[Aura] invitado:", err);
+      }
       state.isLoggedIn = true;
-      state.name = guestName || "Invitado";
+      state.name = nombre || state.name || "Invitado";
       saveState();
-      authOverlay.classList.add("hidden");
-      renderHome();
-      renderSettings();
+      cerrarOverlay();
       toast("Bienvenido/a a Aura");
     });
 
-    $("#btnLogout")?.addEventListener("click", () => {
+    $("#btnLogout")?.addEventListener("click", async () => {
+      if (!confirm("Cerrar sesión. Tu diario cifrado se queda en este teléfono, no se borra. ¿Continuar?")) return;
+      await window.AuraAuth?.salir();
       state.isLoggedIn = false;
       saveState();
-      authOverlay.classList.remove("hidden");
+      $("#authOverlay")?.classList.remove("hidden");
+      pintarSesion();
       toast("Sesión cerrada");
     });
+
+    pintarSesion();
   }
 
-  /* Routing */
   const SCREENS = ["inicio", "diario", "auroria", "calma", "especialistas", "ajustes"];
   function showScreen(name) {
     if (!SCREENS.includes(name)) name = "inicio";

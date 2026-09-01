@@ -4,7 +4,11 @@
    Regenerar con: npm run build:firebase                                */
 import { initializeApp } from "firebase/app";
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
-import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "firebase/auth";
+import {
+  getAuth, signInAnonymously, onAuthStateChanged, signOut,
+  GoogleAuthProvider, signInWithPopup, signInWithCredential, linkWithCredential,
+  setPersistence, browserLocalPersistence
+} from "firebase/auth";
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
   getFirestore, doc, getDoc, setDoc, updateDoc, addDoc, collection,
@@ -41,6 +45,8 @@ export const app = () => firebaseApp;
 
 export {
   getAuth, signInAnonymously, onAuthStateChanged, signOut,
+  GoogleAuthProvider, signInWithPopup, signInWithCredential, linkWithCredential,
+  setPersistence, browserLocalPersistence,
   getFirestore, doc, getDoc, setDoc, updateDoc, addDoc, collection,
   serverTimestamp, deleteField,
   getAI, getGenerativeModel, GoogleAIBackend

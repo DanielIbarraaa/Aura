@@ -27,10 +27,20 @@
       db = FB.getFirestore(app);
       auth = FB.getAuth(app);
 
+      // La sesión NO se abre aquí. Iniciarla es decisión del paciente, en la
+      // pantalla de login; este módulo solo consume el uid que ya exista.
+      // Si empezara una sesión anónima por su cuenta, el login se saltaría solo.
+      FB.onAuthStateChanged(auth, (u) => {
+        uid = u ? u.uid : null;
+        ready = !!uid;
+        markDot(ready ? "on" : "off");
+        if (ready && pending) publish(pending, "reconexion");
+      });
+
       uid = auth.currentUser ? auth.currentUser.uid : null;
       if (!uid) {
-        const cred = await FB.signInAnonymously(auth);
-        uid = cred.user.uid;
+        markDot("off");
+        return false;   // aún nadie dentro; se conecta cuando entre
       }
       if (state && !state.patientId) {
         state.patientId = uid;
@@ -39,6 +49,7 @@
       ready = true;
       markDot("on");
       if (pending) publish(pending, "reconexion");
+      return true;
     } catch (e) {
       ready = false;
       markDot("off");

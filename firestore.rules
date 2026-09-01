@@ -21,6 +21,13 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(campos);
     }
 
+    // ---------- Perfil del usuario de la app ----------
+    // Lo mínimo para que la cuenta exista. Cada quien solo se ve a sí mismo:
+    // ni siquiera su terapeuta entra aquí — él lee /patients y /metrics.
+    match /users/{uid} {
+      allow read, write: if esUno(uid);
+    }
+
     // ---------- Perfil del especialista ----------
     match /therapists/{uid} {
       allow get: if esUno(uid);
