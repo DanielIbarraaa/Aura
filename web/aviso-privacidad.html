@@ -37,9 +37,10 @@
     <span>Este documento es un punto de partida honesto sobre cómo funciona Aura técnicamente, no un aviso de privacidad revisado por un abogado. La Ley Federal de Protección de Datos Personales en Posesión de los Particulares exige contenidos específicos (identidad y domicilio del responsable, finalidades, medios para ejercer derechos ARCO, transferencias). Complétalos antes de publicar.</span>
   </div>
 
-  <h2>Qué se queda en tu teléfono</h2>
-  <p>El contenido de tu diario se cifra en tu propio dispositivo con AES-256, usando una llave derivada de tu PIN de cuatro dígitos mediante PBKDF2. Ese texto no se transmite a ningún servidor. Tu PIN tampoco: no se guarda, no se envía y no se puede recuperar. Si lo olvidas, las entradas quedan ilegibles de forma permanente, incluso para nosotros.</p>
-  <p>El historial completo de tus conversaciones con aurorIA también se guarda solo en el dispositivo.</p>
+  <h2>Qué se cifra antes de salir de tu teléfono</h2>
+  <p>El contenido de tu diario se cifra en tu propio dispositivo con AES-256, usando una llave derivada de tu PIN de cuatro dígitos mediante PBKDF2. Lo que se guarda en la nube es únicamente el resultado cifrado: bytes que nadie puede interpretar. Tu PIN no se guarda, no se envía y no se puede recuperar. Si lo olvidas, las entradas quedan ilegibles de forma permanente, también para nosotros.</p>
+  <p>Guardarlo así, y no en tu teléfono, es lo que te permite cambiar de dispositivo sin perder tu diario.</p>
+  <p>Tus conversaciones con aurorIA se guardan en tu cuenta, en un área privada a la que solo entras tú. Tu terapeuta no tiene acceso a ellas, ni siquiera si te vinculaste con él: las reglas del servidor se lo impiden. A diferencia del diario, este historial no está cifrado con tu PIN, así que técnicamente el operador del servicio podría leerlo — te lo decimos porque es la diferencia real entre las dos cosas.</p>
 
   <h2>Qué se comparte con tu especialista</h2>
   <p>Únicamente si vinculas tu cuenta con el código de un terapeuta, y únicamente en forma de números:</p>

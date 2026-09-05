@@ -11,7 +11,8 @@ import {
 } from "firebase/auth";
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-  getFirestore, doc, getDoc, setDoc, updateDoc, addDoc, collection,
+  getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, addDoc, collection,
+  query, where, orderBy, limit, onSnapshot,
   serverTimestamp, deleteField
 } from "firebase/firestore";
 import { getAI, getGenerativeModel, GoogleAIBackend } from "firebase/ai";
@@ -47,7 +48,8 @@ export {
   getAuth, signInAnonymously, onAuthStateChanged, signOut,
   GoogleAuthProvider, signInWithPopup, signInWithCredential, linkWithCredential,
   setPersistence, browserLocalPersistence,
-  getFirestore, doc, getDoc, setDoc, updateDoc, addDoc, collection,
+  getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, addDoc, collection,
+  query, where, orderBy, limit, onSnapshot,
   serverTimestamp, deleteField,
   getAI, getGenerativeModel, GoogleAIBackend
 };

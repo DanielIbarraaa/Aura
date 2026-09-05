@@ -32,8 +32,8 @@ if (!perfil.exists()) {
 } else {
   const p = perfil.data();
   $("#miNombre").textContent = p.name || user.email;
-  $("#miCodigo").textContent = p.code || "AUR-••••";
-  $("#codigoInline").textContent = p.code || "AUR-••••";
+  $("#miCodigo").textContent = p.code || "AUR-••••••";
+  $("#codigoInline").textContent = p.code || "AUR-••••••";
   if (p.verified === false) {
     $("#miCodigo").insertAdjacentHTML("afterend",
       `<span class="pastilla p-alerta" title="Tu cédula sigue en revisión">Cédula en revisión</span>`);

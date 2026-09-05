@@ -83,7 +83,7 @@
     </form>
 
     <p style="font-size:11.5px; color:var(--text-mute); margin-top:20px; line-height:1.4;">
-      Tus datos están protegidos bajo cifrado local y las políticas de confidencialidad de Aura.
+      Tu diario se cifra en este dispositivo antes de guardarse. Ni tu terapeuta ni nosotros podemos leerlo.
     </p>
   </div>
 </div>
@@ -390,67 +390,28 @@
   <section class="screen" id="screen-especialistas">
     <div class="section-head">
       <h2>Red de Especialistas</h2>
-      <p>Terapeutas y psicólogos con cédula profesional verificada para acompañamiento clínico.</p>
-      <div class="demo-banner" id="specialistsDemoBanner">Catálogo de demostración. Los perfiles y cédulas que ves abajo son de ejemplo y se reemplazan por especialistas reales dados de alta en la plataforma web.</div>
+      <p>Terapeutas y psicólogos con cédula profesional verificada ante el Registro Nacional de Profesionistas.</p>
     </div>
 
-    <div class="grid-2">
-      <div class="card glass psy-card-box">
-        <div>
-          <div class="psy-header">
-            <div class="psy-avatar-circle">
-              <img src="assets/psicologa-aurora.jpg" alt="Lic. Aurora Valdivia" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null;this.src='icons/maskable-192.png'">
-            </div>
-            <div>
-              <h3 style="font-size:16.5px;">Lic. Aurora Valdivia</h3>
-              <div style="font-size:13px; color:var(--text-soft);">Psicología Cognitivo-Conductual</div>
-              <div class="psy-cedula-tag">Cédula Prof: 11482903</div>
-            </div>
-          </div>
-          <div style="margin: 10px 0; display:flex; gap:6px;">
-            <span class="chip on">En línea</span>
-            <span class="chip">Presencial</span>
-          </div>
-          <p style="font-size:13px; color:var(--text-soft); margin-bottom:10px;">
-            <strong>Ubicación:</strong> 26 de Marzo 205, Aguascalientes (Centro Micael)
-          </p>
-          <div style="font-size:18px; font-weight:800; color:var(--text); margin-bottom:16px;">
-            $600 <span style="font-size:13px; font-weight:400; color:var(--text-soft);">/ sesión</span>
-          </div>
-        </div>
-        <div style="display:flex; flex-direction:column; gap:8px;">
-          <button class="glass-btn primary block" data-external="https://wa.me/524491234567?text=Hola%20Lic.%20Aurora,%20vengo%20desde%20la%20app%20Aura%20y%20me%20gustaría%20agendar%20una%20sesión.">
-            <svg class="icon icon-sm"><use href="#i-message-circle"/></svg>Contactar por WhatsApp
-          </button>
-        </div>
-      </div>
+    <!-- El catálogo se lee de /directory en Firestore. Ahí solo llegan los
+         especialistas cuya cédula ya fue verificada: los escribe la Cloud
+         Function publicarDirectorio, nunca el propio terapeuta. -->
+    <div id="directorioLista"></div>
 
-      <div class="card glass psy-card-box">
-        <div>
-          <div class="psy-header">
-            <div class="psy-avatar-circle">RT</div>
-            <div>
-              <h3 style="font-size:16.5px;">Psic. Roberto Torres</h3>
-              <div style="font-size:13px; color:var(--text-soft);">Terapia de Exposición y Fobias</div>
-              <div class="psy-cedula-tag">Cédula Prof: 09284711</div>
-            </div>
-          </div>
-          <div style="margin: 10px 0; display:flex; gap:6px;">
-            <span class="chip on">En línea</span>
-          </div>
-          <p style="font-size:13px; color:var(--text-soft); margin-bottom:10px;">
-            <strong>Enfoque:</strong> Desensibilización sistemática de la fobia social y entrenamiento en asertividad.
-          </p>
-          <div style="font-size:18px; font-weight:800; color:var(--text); margin-bottom:16px;">
-            $550 <span style="font-size:13px; font-weight:400; color:var(--text-soft);">/ sesión</span>
-          </div>
-        </div>
-        <div style="display:flex; flex-direction:column; gap:8px;">
-          <button class="glass-btn primary block" data-external="https://wa.me/524497654321?text=Hola%20Psic.%20Roberto,%20vengo%20desde%20la%20app%20Aura%20y%20me%20gustaría%20agendar%20una%20sesión.">
-            <svg class="icon icon-sm"><use href="#i-message-circle"/></svg>Contactar por WhatsApp
-          </button>
-        </div>
-      </div>
+    <div id="directorioVacio" class="card glass hidden" style="text-align:center; padding:32px 22px;">
+      <svg class="icon-lg" style="color:var(--c-purple-shadow);"><use href="#i-users"/></svg>
+      <h3 style="font-size:17px; margin-top:10px;">Todavía no hay especialistas publicados</h3>
+      <p style="font-size:13.5px; color:var(--text-soft); margin-top:6px; line-height:1.5;">
+        Estamos verificando las cédulas de los primeros terapeutas. En cuanto haya alguien
+        disponible aparecerá aquí.
+      </p>
+      <p style="font-size:12.5px; color:var(--text-mute); margin-top:14px; line-height:1.5;">
+        Si ya tienes terapeuta, pídele su código y vincúlalo en Configuración → Mi especialista.
+      </p>
+    </div>
+
+    <div id="directorioCargando" style="text-align:center; padding:28px; color:var(--text-soft); font-size:13.5px;">
+      Cargando especialistas…
     </div>
   </section>
 
@@ -528,7 +489,7 @@
         <button class="glass-btn sm" id="btnUnlink">Desvincular</button>
       </div>
       <div id="linkForm" style="display:flex; gap:8px;">
-        <input type="text" id="linkCodeInput" class="input-field" placeholder="AUR-0000" maxlength="8" autocapitalize="characters" style="flex:1;">
+        <input type="text" id="linkCodeInput" class="input-field" placeholder="AUR-K7QF29" maxlength="10" autocapitalize="characters" style="flex:1;">
         <button class="glass-btn primary sm" id="btnLink">Vincular</button>
       </div>
       <p id="linkHint" style="font-size:11.5px; color:var(--text-soft); margin-top:8px;"></p>
@@ -639,8 +600,10 @@
      los módulos de Aura, que esperan encontrar window.AuraFB ya listo. -->
 <script src="vendor/aura-firebase.js"></script>
 <script src="js/aura-auth.js"></script>
+<script src="js/aura-estado.js"></script>
 <script src="js/aura-ai.js"></script>
 <script src="js/aura-sync.js"></script>
+<script src="js/aura-directorio.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

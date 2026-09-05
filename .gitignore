@@ -29,3 +29,6 @@ _to_delete/
 
 # Config de Firebase para Android: no son secretos, pero decide tú si se versiona
 # google-services.json
+
+# Cache del CLI de Firebase
+.firebase/

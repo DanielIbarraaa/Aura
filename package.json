@@ -8,13 +8,15 @@
     "serve": "python3 -m http.server 5173 -d www",
     "sync": "npx cap sync",
     "android": "bash tools/build-android.sh",
-    "deploy:web": "firebase deploy --only hosting",
+    "deploy:web": "firebase deploy --only hosting:sitio",
     "deploy:rules": "firebase deploy --only firestore:rules",
     "deploy:functions": "firebase deploy --only functions",
     "emu": "firebase emulators:start",
     "android:release": "bash tools/build-android.sh release",
     "abrir": "npx cap open android",
-    "iconos": "python3 tools/make-icons.py && python3 tools/make-mascota.py"
+    "iconos": "python3 tools/make-icons.py && python3 tools/make-mascota.py",
+    "deploy:app": "firebase deploy --only hosting:app",
+    "deploy:todo": "firebase deploy --only hosting,firestore:rules,functions"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",

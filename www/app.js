@@ -41,19 +41,55 @@
   let pinBuffer = "";
   let count90Val = 9;
 
+  /* El estado arranca en blanco y se hidrata desde Firestore en cuanto hay
+     sesión (ver hidratar()). Lo único que se lee del navegador es el tema,
+     porque tiene que aplicarse antes de que Auth resuelva o la pantalla
+     parpadea. */
   function loadState() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? Object.assign(defaultState(), JSON.parse(raw)) : defaultState();
-    } catch { 
-      return defaultState(); 
-    }
+    const s = defaultState();
+    const t = window.AuraEstado?.tema.leer();
+    if (t) s.theme = t;
+    return s;
   }
 
   function saveState() {
-    try { 
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); 
-    } catch {}
+    window.AuraEstado?.tema.escribir(state.theme);
+    window.AuraEstado?.guardar(state);
+  }
+
+  /* Trae lo que hay en la nube y, la primera vez, sube lo que quedó en el
+     teléfono de la versión anterior. Si la nube ya tiene datos, gana la nube:
+     el usuario pudo haber seguido en otro dispositivo. */
+  async function hidratar(u) {
+    if (!u || !u.uid || !window.AuraEstado) return;
+    try {
+      const nube = await window.AuraEstado.cargar(u.uid);
+      const r = await window.AuraEstado.migrar(nube);
+      if (r.estado) Object.assign(state, r.estado);
+      if (r.migrado) toast("Tus datos se movieron a tu cuenta");
+
+      state.isLoggedIn = true;
+      state.patientId = u.uid;
+      if (u.nombre && !state.name) state.name = u.nombre;
+      if (u.email) state.email = u.email;
+
+      diaryKey = null;
+      diaryUnlocked = false;
+      pinBuffer = "";
+
+      applyTheme(state.theme);
+      renderHome();
+      renderSettings();
+      renderLink();
+      renderDiary();
+      drawChart();
+      computeClinicalData();
+      pintarSesion();
+      saveState();
+    } catch (e) {
+      console.warn("[Aura] no se pudo cargar el estado:", e.message);
+      toast("Sin conexión: tus cambios se guardarán al volver la señal");
+    }
   }
 
   function toast(msg) {
@@ -130,11 +166,8 @@
     window.AuraAuth?.alCambiar((u) => {
       if (u) {
         state.isLoggedIn = true;
-        if (u.nombre && !state.name) state.name = u.nombre;
-        if (u.email) state.email = u.email;
-        if (u.uid) state.patientId = u.uid;
-        saveState();
         cerrarOverlay();
+        hidratar(u);
       }
       pintarSesion();
     });
@@ -148,12 +181,8 @@
       if (txt) txt.textContent = "Conectando…";
       try {
         const u = await window.AuraAuth.entrarConGoogle();
-        state.isLoggedIn = true;
-        state.name = u.nombre || state.name || "";
-        state.email = u.email || state.email || "";
-        state.patientId = u.uid;
-        saveState();
         cerrarOverlay();
+        await hidratar(u);
         toast("Sesión iniciada con Google");
       } catch (e) {
         toast(errorAuth(e));
@@ -181,7 +210,9 @@
 
     $("#btnLogout")?.addEventListener("click", async () => {
       if (!confirm("Cerrar sesión. Tu diario cifrado se queda en este teléfono, no se borra. ¿Continuar?")) return;
+      await window.AuraEstado?.sincronizarYa();
       await window.AuraAuth?.salir();
+      state = defaultState();
       state.isLoggedIn = false;
       saveState();
       $("#authOverlay")?.classList.remove("hidden");
@@ -207,6 +238,7 @@
     if (name === "diario") renderDiary();
     if (name === "auroria") renderAurorIA();
     if (name === "calma") initCanvasOnce();
+    if (name === "especialistas") window.AuraDirectorio?.render();
     if (name === "ajustes") renderSettings();
     location.hash = "#/" + name;
   }
@@ -878,8 +910,8 @@
     const input = $("#linkCodeInput");
     const hint = $("#linkHint");
     const code = (input?.value || "").trim().toUpperCase();
-    if (!/^AUR-[A-Z0-9]{4}$/.test(code)) {
-      if (hint) { hint.className = "link-err"; hint.textContent = "El código va como AUR-1148."; }
+    if (!/^AUR-[A-Z0-9]{6}$/.test(code)) {
+      if (hint) { hint.className = "link-err"; hint.textContent = "El código va como AUR-K7QF29."; }
       return;
     }
     if (!window.AuraSync) {
@@ -1013,11 +1045,17 @@
     });
 
     // Reset general
-    $("#resetBtn")?.addEventListener("click", () => {
-      if (confirm("¿Borrar todos los datos de Aura?")) {
-        localStorage.removeItem(STORAGE_KEY);
-        location.reload();
+    $("#resetBtn")?.addEventListener("click", async () => {
+      if (!confirm("Esto borra tu diario, tu historial de ánimo y tus conversaciones, en este teléfono y en tu cuenta. No se puede deshacer. ¿Continuar?")) return;
+      state = defaultState();
+      try {
+        await window.AuraEstado?.guardar(state);
+        await window.AuraEstado?.sincronizarYa();
+      } catch (e) {
+        console.warn("[Aura] borrado:", e.message);
       }
+      try { localStorage.removeItem(STORAGE_KEY); } catch {}
+      location.reload();
     });
 
     // SOS Modal Fix (Abrir y Cerrar)

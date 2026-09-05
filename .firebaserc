@@ -1,5 +1,17 @@
 {
   "projects": {
     "default": "aura-2027"
+  },
+  "targets": {
+    "aura-2027": {
+      "hosting": {
+        "sitio": [
+          "aura-2027"
+        ],
+        "app": [
+          "aura-2027-app"
+        ]
+      }
+    }
   }
 }

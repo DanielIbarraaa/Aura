@@ -1,4 +1,6 @@
-/* Genera y reserva el código de invitación del especialista (AUR-XXXX).
+/* Genera y reserva el código de invitación del especialista (AUR-XXXXXX).
+   Seis caracteres de un alfabeto de 32 = mil millones de combinaciones.
+   Con cuatro eran un millón, y un millón se adivina uno por uno.
    Sin I, O, 0, 1: se dictan por teléfono y se escriben a mano. */
 import { db, F } from "./firebase.js";
 
@@ -6,8 +8,8 @@ const ALFABETO = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 function candidato() {
   let s = "";
-  const r = crypto.getRandomValues(new Uint8Array(4));
-  for (let i = 0; i < 4; i++) s += ALFABETO[r[i] % ALFABETO.length];
+  const r = crypto.getRandomValues(new Uint8Array(6));
+  for (let i = 0; i < 6; i++) s += ALFABETO[r[i] % ALFABETO.length];
   return `AUR-${s}`;
 }
 
