@@ -634,6 +634,10 @@
 
 <div class="toast-wrap" id="toastWrap"></div>
 <script src="js/aura-config.js"></script>
+<!-- El SDK de Firebase empaquetado (npm run build:firebase). Va DESPUÉS de
+     aura-config.js, porque lee window.AURA_CONFIG al cargarse, y ANTES de
+     los módulos de Aura, que esperan encontrar window.AuraFB ya listo. -->
+<script src="vendor/aura-firebase.js"></script>
 <script src="js/aura-auth.js"></script>
 <script src="js/aura-ai.js"></script>
 <script src="js/aura-sync.js"></script>

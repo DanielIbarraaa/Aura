@@ -1,7 +1,7 @@
 /* Aura — service worker
    App shell precacheada; todo lo de red (Firebase, Google Fonts, Spotify)
    se deja pasar sin tocar, porque cachear respuestas de API rompe la app. */
-const CACHE = 'aura-v4';
+const CACHE = 'aura-v5';
 const ASSETS = [
   './', './index.html', './style.css', './app.js', './manifest.json',
   './js/aura-config.js', './js/aura-auth.js', './js/aura-ai.js', './js/aura-sync.js',
