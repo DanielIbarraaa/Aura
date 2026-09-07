@@ -85,6 +85,11 @@
     <p style="font-size:11.5px; color:var(--text-mute); margin-top:20px; line-height:1.4;">
       Tu diario se cifra en este dispositivo antes de guardarse. Ni tu terapeuta ni nosotros podemos leerlo.
     </p>
+
+    <button type="button" class="auth-sos-link" id="authSosBtn">
+      <svg class="icon icon-sm"><use href="#i-alert-triangle"/></svg>
+      ¿Estás en crisis? Entra directo al apoyo inmediato
+    </button>
   </div>
 </div>
 
@@ -183,6 +188,13 @@
       <p>Cifrado en este dispositivo con PIN (AES-256). Formulario diario de bienestar.</p>
     </div>
 
+
+    <div class="descargo">
+      <svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>
+      <span><b>Aura es una herramienta de apoyo emocional y NO sustituye la atención médica o psicológica profesional.</b>
+      Consulta el portal del <button type="button" class="enlace-inline" data-external="https://www.inprf.gob.mx">Instituto Nacional de Psiquiatría</button>.</span>
+    </div>
+
     <div class="mood-card glass card">
       <div class="mood-face">
         <svg class="icon-lg"><use href="#i-bar-chart"/></svg>
@@ -244,6 +256,12 @@
         </div>
       </div>
       <button class="glass-btn sm" id="clearMemoryBtn"><svg class="icon icon-sm"><use href="#i-trash"/></svg>Reiniciar</button>
+    </div>
+
+    <div class="descargo">
+      <svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>
+      <span><b>Aura es una herramienta de apoyo emocional y NO sustituye la atención médica o psicológica profesional.</b>
+      Consulta el portal del <button type="button" class="enlace-inline" data-external="https://www.inprf.gob.mx">Instituto Nacional de Psiquiatría</button>.</span>
     </div>
 
     <div class="card glass" style="padding:0; overflow:hidden;">
@@ -586,9 +604,18 @@
       <button class="glass-btn block" id="sosToSpecialists">
         <svg class="icon icon-sm"><use href="#i-message-circle"/></svg>WhatsApp a mi Especialista
       </button>
+      <button class="glass-btn block" data-external="https://www.inprf.gob.mx">
+        <svg class="icon icon-sm"><use href="#i-shield"/></svg>Portal del Instituto Nacional de Psiquiatría
+      </button>
       <p style="font-size:11px; color:var(--text-soft); text-align:center; margin-top:4px;">
         Nota: Tu terapeuta responderá en cuanto esté fuera de sesión. Si estás en peligro inminente, llama al 911 o acude al servicio de urgencias más cercano.
       </p>
+
+    <div class="descargo">
+      <svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>
+      <span><b>Aura es una herramienta de apoyo emocional y NO sustituye la atención médica o psicológica profesional.</b>
+      Consulta el portal del <button type="button" class="enlace-inline" data-external="https://www.inprf.gob.mx">Instituto Nacional de Psiquiatría</button>.</span>
+    </div>
     </div>
   </div>
 </div>

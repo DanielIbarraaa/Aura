@@ -1064,6 +1064,12 @@
       runSosBreathe();
     });
 
+    // El apoyo en crisis no exige tener sesion: se abre desde el login.
+    $("#authSosBtn")?.addEventListener("click", () => {
+      $("#sosOverlay")?.classList.add("open");
+      runSosBreathe();
+    });
+
     $("#sosClose")?.addEventListener("click", () => {
       $("#sosOverlay")?.classList.remove("open");
       stopSosBreathe();

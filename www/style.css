@@ -441,3 +441,38 @@ button { cursor: pointer; border: none; background: none; }
   border: 1px solid var(--glass-border);
 }
 .bubble.bot { position: relative; }
+
+
+/* Descargo de responsabilidad clínica (RF-16 / RNF-21): obligatorio en toda
+   pantalla relacionada con salud mental — IA, diario y alerta de crisis. */
+.descargo {
+  display: flex; gap: 9px; align-items: flex-start;
+  padding: 11px 13px; margin: 14px 0 0;
+  border: 1px solid var(--glass-border); border-radius: var(--radius-md);
+  background: rgba(134, 123, 184, 0.12);
+  font-size: 11.5px; line-height: 1.5; color: var(--text-soft);
+}
+.descargo .icon { flex: 0 0 auto; width: 15px; height: 15px; margin-top: 1px; color: var(--c-purple-shadow); }
+.descargo b { font-weight: 700; }
+.enlace-inline {
+  display: inline; background: none; border: 0; padding: 0; margin: 0;
+  font: inherit; color: inherit; font-weight: 700; text-align: inherit;
+  text-decoration: underline; cursor: pointer;
+}
+.enlace-inline:hover { color: var(--c-purple-shadow); }
+.enlace-inline:focus-visible { outline: 2px solid var(--c-purple-shadow); outline-offset: 2px; border-radius: 3px; }
+
+
+/* RF-07: el panel de crisis debe abrirse sin requerir autenticacion, asi que
+   va por encima del overlay de inicio de sesion (z-index 400). */
+#sosOverlay { z-index: 500; }
+.auth-sos-link {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  width: 100%; margin-top: 14px; padding: 10px 12px;
+  background: rgba(214, 90, 122, 0.12); border: 1px solid rgba(214, 90, 122, 0.32);
+  border-radius: var(--radius-md); cursor: pointer;
+  font-size: 12.5px; font-weight: 700; font-family: inherit; color: #8A2B43;
+  transition: background .2s ease;
+}
+.auth-sos-link:hover { background: rgba(214, 90, 122, 0.2); }
+.auth-sos-link .icon { width: 15px; height: 15px; flex: 0 0 auto; }
