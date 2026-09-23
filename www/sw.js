@@ -1,10 +1,15 @@
 /* Aura — service worker
    App shell precacheada; todo lo de red (Firebase, Google Fonts, Spotify)
    se deja pasar sin tocar, porque cachear respuestas de API rompe la app. */
-const CACHE = 'aura-v9';
+/* SUBE ESTE NUMERO EN CADA DEPLOY QUE CAMBIE UN ARCHIVO.
+   El handler de 'activate' borra todo cache cuyo nombre no sea este; si el
+   nombre no cambia, el cache viejo sobrevive y el navegador sigue sirviendo
+   codigo anterior aunque el deploy haya salido bien. */
+const CACHE = 'aura-v11';
 const ASSETS = [
   './', './index.html', './style.css', './app.js', './manifest.json',
-  './js/aura-config.js', './js/aura-auth.js', './js/aura-estado.js', './js/aura-ai.js', './js/aura-sync.js', './js/aura-directorio.js',
+  './js/aura-config.js', './js/aura-auth.js', './js/aura-estado.js',
+  './js/aura-cripto.js', './js/aura-consentimiento.js', './js/aura-ai.js', './js/aura-sync.js', './js/aura-directorio.js',
   './vendor/aura-firebase.js',
   './icon-192.png', './icon-512.png', './favicon-32.png',
   './icons/maskable-192.png', './icons/maskable-512.png', './icons/apple-touch-icon.png',
@@ -49,7 +54,31 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Estáticos: caché primero, y se refresca en segundo plano.
+  /* Codigo (JS y CSS): RED PRIMERO, con el cache solo como red de
+     seguridad sin conexion.
+
+     Antes esto era cache primero. El resultado era que tras un deploy el
+     navegador servia el index.html nuevo (que si es red primero) junto al
+     app.js viejo del cache: una mezcla que no existe en ningun lado y que
+     rompe la app de formas dificiles de diagnosticar. El costo de ir a la
+     red por un par de archivos pequenos es mucho menor que el de servir
+     una version que nadie probo. */
+  const esCodigo = /\.(js|css)(\?|$)/.test(url.pathname + url.search);
+  if (esCodigo) {
+    e.respondWith(
+      fetch(req).then(r => {
+        if (r && r.status === 200 && r.type === 'basic') {
+          const copy = r.clone();
+          caches.open(CACHE).then(c => c.put(req, copy));
+        }
+        return r;
+      }).catch(() => caches.match(req))
+    );
+    return;
+  }
+
+  // Imagenes, fuentes y demas: cache primero y refresco en segundo plano.
+  // Estos si se pueden servir viejos sin romper nada.
   e.respondWith(
     caches.match(req).then(cached => {
       const net = fetch(req).then(r => {
