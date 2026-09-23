@@ -476,3 +476,201 @@ button { cursor: pointer; border: none; background: none; }
 }
 .auth-sos-link:hover { background: rgba(214, 90, 122, 0.2); }
 .auth-sos-link .icon { width: 15px; height: 15px; flex: 0 0 auto; }
+
+
+/* Inicio de sesion con correo: es el camino que funciona igual en el
+   navegador y dentro del APK, sin depender de plugins nativos. */
+.auth-overlay .auth-card { max-height: 100%; overflow-y: auto; }
+.auth-links { display: flex; justify-content: space-between; gap: 10px; margin-top: 12px; }
+.auth-links button {
+  background: none; border: 0; padding: 2px 0; cursor: pointer;
+  font-family: inherit; font-size: 12px; font-weight: 600; color: var(--text-soft);
+  text-decoration: underline;
+}
+.auth-links button:hover { color: var(--c-purple-shadow); }
+.auth-links button:focus-visible { outline: 2px solid var(--c-purple-shadow); outline-offset: 2px; border-radius: 3px; }
+
+
+/* aurorIA respondiendo en local: decir por que, en vez de fingir que
+   el guion enlatado es una conversacion. */
+.aviso-ia {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin: 10px 14px 4px; padding: 10px 13px;
+  border: 1px dashed var(--glass-border); border-radius: var(--radius-md);
+  background: rgba(134, 123, 184, 0.10);
+  font-size: 12px; line-height: 1.45; color: var(--text-soft);
+}
+.aviso-ia span { flex: 1 1 190px; }
+.aviso-ia .glass-btn { flex: 0 0 auto; padding: 5px 14px; font-size: 12px; }
+
+
+/* Filas de "texto a la izquierda, accion a la derecha".
+   El problema en pantallas estrechas era que los elementos flex no encogen
+   por debajo de su contenido (min-width:auto), asi que el texto desbordaba
+   y el boton se aplastaba. Con wrap + min-width:0 el boton baja de renglon
+   en vez de estorbar, y un correo largo parte en vez de salirse. */
+.fila-accion {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap;
+}
+.fila-accion > .fila-info {
+  display: flex; align-items: center; gap: 12px;
+  flex: 1 1 220px; min-width: 0;
+}
+.fila-accion > .fila-info > div { min-width: 0; }
+.fila-accion > .glass-btn,
+.fila-accion > button { flex: 0 0 auto; white-space: nowrap; }
+.fila-accion .fila-info strong,
+.fila-accion .fila-info span,
+.fila-accion .fila-info p { overflow-wrap: anywhere; }
+.fila-accion .auroria-avatar,
+.fila-accion .psy-avatar-circle { flex: 0 0 auto; }
+
+/* ---------- Consentimiento informado (RF-15) ----------
+   z-index 450: por encima del inicio de sesion (400) y por DEBAJO del
+   SOS (500). Esa diferencia es deliberada: una persona en crisis nunca
+   debe quedar atrapada detras de un formulario legal. */
+.consent-overlay {
+  position: fixed; inset: 0; z-index: 450;
+  display: none; align-items: center; justify-content: center;
+  padding: 16px;
+  background: rgba(29, 24, 46, 0.62);
+  backdrop-filter: blur(10px);
+}
+.consent-overlay.abierto { display: flex; }
+
+/* Columna flex: el encabezado, las casillas y el boton quedan SIEMPRE
+   a la vista, y solo el cuerpo del aviso scrollea con el espacio que
+   sobre. Si la tarjeta entera scrollea, en pantallas chicas o el titulo
+   o el boton se van fuera, y ninguna de las dos cosas es aceptable en
+   una pantalla donde la persona tiene que decidir algo. */
+.consent-card {
+  width: 100%; max-width: 520px; max-height: 92vh;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  padding: 24px 22px;
+  border-radius: 20px;
+  -webkit-overflow-scrolling: touch;
+}
+.consent-card > *:not(.consent-cuerpo) { flex: 0 0 auto; }
+.consent-card h2 {
+  font-size: 21px; font-weight: 800; color: var(--text);
+  text-align: center; margin-bottom: 8px;
+}
+.consent-intro {
+  font-size: 13.5px; line-height: 1.55; color: var(--text-soft);
+  text-align: center; margin-bottom: 18px;
+}
+
+/* El cuerpo scrollea aparte para que las casillas y el boton queden
+   siempre a la vista: si hay que bajar hasta el fondo para encontrar el
+   boton, la gente acepta sin leer, que es justo lo que se quiere evitar. */
+.consent-cuerpo {
+  /* min-height: 0 es obligatorio. Un hijo flex trae min-height: auto por
+     defecto y se niega a encoger por debajo de su contenido: la tarjeta
+     crece mas alla de su max-height y, con overflow hidden, lo que se
+     recorta es justo el boton del final. */
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  padding: 14px 16px; margin-bottom: 14px;
+  border-radius: 14px;
+  background: rgba(108, 92, 231, 0.05);
+  border: 1px solid rgba(108, 92, 231, 0.12);
+}
+.consent-cuerpo h3 {
+  font-size: 13px; font-weight: 700; color: var(--text);
+  margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .04em;
+}
+.consent-cuerpo h3:first-child { margin-top: 0; }
+.consent-cuerpo p,
+.consent-cuerpo li { font-size: 13px; line-height: 1.5; color: var(--text-soft); }
+.consent-cuerpo ul { padding-left: 18px; margin: 0; }
+.consent-cuerpo li { margin-top: 5px; }
+.consent-cuerpo li::marker { color: var(--c-purple-shadow); }
+/* Identificar cuales datos son sensibles lo exige el articulo 15 fraccion
+   II. Pero pintarlos en rojo los lee como advertencia, y termina alarmando
+   justo en la linea que dice que nadie puede abrirlos. Una etiqueta
+   discreta cumple la ley sin convertir la transparencia en amenaza. */
+.consent-cuerpo li.sensible { color: var(--text-soft); }
+.tag-salud {
+  display: inline-block;
+  margin-left: 4px; padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10.5px; font-weight: 600;
+  letter-spacing: .02em; white-space: nowrap;
+  color: var(--c-purple-shadow);
+  background: rgba(108, 92, 231, 0.12);
+}
+
+.consent-nota {
+  font-size: 12px; line-height: 1.5; color: var(--text-soft);
+  margin: 8px 0 0;
+}
+.consent-enlaces { margin-top: 14px; font-size: 12.5px; }
+.consent-enlaces a { color: var(--c-purple-shadow); text-decoration: underline; }
+
+.consent-check {
+  display: flex; align-items: flex-start; gap: 11px;
+  padding: 12px 14px; margin-bottom: 10px;
+  border-radius: 12px; cursor: pointer;
+  border: 1px solid rgba(108, 92, 231, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+}
+.consent-check span { font-size: 12.5px; line-height: 1.5; color: var(--text); }
+.consent-check a { color: var(--c-purple-shadow); text-decoration: underline; }
+.consent-check input[type="checkbox"] {
+  flex: 0 0 auto; width: 19px; height: 19px; margin-top: 1px;
+  accent-color: var(--c-purple-shadow); cursor: pointer;
+}
+.consent-check-sensible {
+  border-color: rgba(108, 92, 231, 0.42);
+  background: rgba(108, 92, 231, 0.05);
+}
+
+.consent-acciones { margin-top: 16px; }
+.consent-acciones button { width: 100%; justify-content: center; }
+.consent-acciones button:disabled { opacity: .45; cursor: not-allowed; }
+
+.consent-sos {
+  display: block; width: 100%; margin-top: 12px;
+  background: none; border: none; cursor: pointer;
+  font-size: 12.5px; color: #D65A7A; text-decoration: underline;
+}
+
+/* Tarjeta que sustituye a un modulo personal cuando la persona no
+   consintio el tratamiento de datos sensibles. */
+.sin-consent {
+  text-align: center; padding: 26px 22px;
+}
+.sin-consent h3 { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+.sin-consent p { font-size: 13px; line-height: 1.55; color: var(--text-soft); margin-bottom: 16px; }
+
+/* Pantallas cortas: el aviso completo esta a un toque de distancia en el
+   enlace, asi que el resumen de arriba cede espacio antes que las
+   casillas o el boton, que son lo que la persona necesita alcanzar. */
+@media (max-width: 420px), (max-height: 700px) {
+  .consent-card { padding: 16px 14px; max-height: 96vh; }
+  .consent-cuerpo { padding: 11px 12px; margin-bottom: 12px; }
+  .consent-intro { margin-bottom: 12px; font-size: 12.5px; }
+  .consent-card h2 { font-size: 19px; }
+  .consent-check { padding: 9px 11px; margin-bottom: 8px; }
+  .consent-check span { font-size: 12px; }
+  .consent-acciones { margin-top: 12px; }
+  .consent-sos { margin-top: 9px; font-size: 12px; }
+}
+
+/* Muy corto: la marca y el parrafo introductorio sobran antes que nada.
+   Lo que NUNCA cede es el par casilla-boton: si la persona no alcanza el
+   boton, no puede decidir, y una pantalla de consentimiento que no deja
+   decidir no sirve para lo que existe. */
+@media (max-height: 620px) {
+  .consent-card .brand-mark { display: none; }
+  .consent-intro { display: none; }
+  .consent-card h2 { font-size: 17px; margin-bottom: 10px; }
+  .consent-check { padding: 8px 10px; margin-bottom: 6px; }
+  .consent-check span { font-size: 11.5px; line-height: 1.42; }
+  .consent-check input[type="checkbox"] { width: 17px; height: 17px; }
+  .consent-nota { font-size: 11px; }
+  .consent-cuerpo { margin-bottom: 10px; }
+  .consent-acciones { margin-top: 10px; }
+  .consent-sos { margin-top: 7px; font-size: 11.5px; }
+}
