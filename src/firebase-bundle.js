@@ -7,7 +7,9 @@ import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-ch
 import {
   getAuth, signInAnonymously, onAuthStateChanged, signOut,
   GoogleAuthProvider, signInWithPopup, signInWithCredential, linkWithCredential,
-  setPersistence, browserLocalPersistence
+  setPersistence, browserLocalPersistence,
+  createUserWithEmailAndPassword, signInWithEmailAndPassword,
+  sendPasswordResetEmail, updateProfile, EmailAuthProvider
 } from "firebase/auth";
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
@@ -16,13 +18,42 @@ import {
   serverTimestamp, deleteField
 } from "firebase/firestore";
 import { getAI, getGenerativeModel, GoogleAIBackend } from "firebase/ai";
+import { getFunctions, httpsCallable } from "firebase/functions";
 
 const cfg = window.AURA_CONFIG || {};
 const firebaseApp = initializeApp(cfg.firebase);
 
-// App Check es obligatorio para Firebase AI Logic desde el cliente.
-if (cfg.appCheckSiteKey && !String(cfg.appCheckSiteKey).startsWith("REEMPLAZA")) {
+/* ---------- App Check ----------
+   Obligatorio para Firebase AI Logic a partir del 2 de noviembre de 2026.
+   Sin él, aurorIA deja de responder y cae al guion local.
+
+   Hay tres entornos y cada uno necesita un proveedor distinto:
+     - Navegador en producción  → reCAPTCHA Enterprise.
+     - Navegador en desarrollo  → token de depuración; reCAPTCHA no valida
+                                  localhost contra una llave de producción.
+     - Dentro del APK           → Play Integrity, por el plugin nativo. En el
+                                  WebView de Android el origen es
+                                  capacitor://localhost, que reCAPTCHA rechaza. */
+const enCapacitor = !!(typeof window !== "undefined" && window.Capacitor
+                       && window.Capacitor.isNativePlatform
+                       && window.Capacitor.isNativePlatform());
+const enLocal = typeof location !== "undefined"
+  && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+
+if (enCapacitor) {
+  // El plugin nativo se registra solo; aquí únicamente se le pide arrancar.
+  const nativo = window.Capacitor?.Plugins?.FirebaseAppCheck;
+  if (nativo) {
+    nativo.initialize({ provider: "playIntegrity", isTokenAutoRefreshEnabled: true })
+      .catch((e) => console.warn("[Aura] App Check nativo:", e.message));
+  } else {
+    console.warn("[Aura] Falta @capacitor-firebase/app-check; el APK irá sin App Check.");
+  }
+} else if (cfg.appCheckSiteKey && !String(cfg.appCheckSiteKey).startsWith("REEMPLAZA")) {
   try {
+    // En local, imprime un token de depuración en la consola. Ese token se
+    // registra a mano en la consola de Firebase para poder seguir probando.
+    if (enLocal) self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
     initializeAppCheck(firebaseApp, {
       provider: new ReCaptchaEnterpriseProvider(cfg.appCheckSiteKey),
       isTokenAutoRefreshEnabled: true
@@ -30,6 +61,8 @@ if (cfg.appCheckSiteKey && !String(cfg.appCheckSiteKey).startsWith("REEMPLAZA"))
   } catch (e) {
     console.warn("[Aura] App Check no inicializado:", e.message);
   }
+} else {
+  console.warn("[Aura] App Check SIN configurar. Obligatorio para la IA el 2 de noviembre de 2026.");
 }
 
 // El expediente sigue disponible sin señal y se sincroniza al volver.
@@ -48,8 +81,11 @@ export {
   getAuth, signInAnonymously, onAuthStateChanged, signOut,
   GoogleAuthProvider, signInWithPopup, signInWithCredential, linkWithCredential,
   setPersistence, browserLocalPersistence,
+  createUserWithEmailAndPassword, signInWithEmailAndPassword,
+  sendPasswordResetEmail, updateProfile, EmailAuthProvider,
   getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, addDoc, collection,
   query, where, orderBy, limit, onSnapshot,
   serverTimestamp, deleteField,
-  getAI, getGenerativeModel, GoogleAIBackend
+  getAI, getGenerativeModel, GoogleAIBackend,
+  getFunctions, httpsCallable
 };
