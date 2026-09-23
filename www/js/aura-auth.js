@@ -92,6 +92,51 @@
     return usuario;
   }
 
+
+  /* ---------- Correo y contraseña ----------
+     Es el único camino que funciona igual en el navegador y dentro del
+     WebView de Android sin plugins nativos: son llamadas HTTP al mismo
+     Firebase Auth. Por eso es el método principal en el APK. */
+  async function entrarConCorreo(email, pass) {
+    if (!listo && !(await init())) throw new Error("Firebase no está configurado todavía.");
+    const fb = FB();
+    const out = await fb.signInWithEmailAndPassword(auth, String(email).trim(), pass);
+    usuario = perfilDe(out.user);
+    await guardarPerfil();
+    avisar();
+    return usuario;
+  }
+
+  /** Crea la cuenta. Si ya había sesión de invitado, la convierte sin
+      perder el uid, el diario ni el historial. */
+  async function registrarConCorreo(nombre, email, pass) {
+    if (!listo && !(await init())) throw new Error("Firebase no está configurado todavía.");
+    const fb = FB();
+    const correo = String(email).trim();
+    let user;
+
+    if (auth.currentUser?.isAnonymous) {
+      const cred = fb.EmailAuthProvider.credential(correo, pass);
+      user = (await fb.linkWithCredential(auth.currentUser, cred)).user;
+    } else {
+      user = (await fb.createUserWithEmailAndPassword(auth, correo, pass)).user;
+    }
+
+    if (nombre) {
+      try { await fb.updateProfile(user, { displayName: nombre }); } catch (e) { /* no es crítico */ }
+    }
+    usuario = perfilDe(user);
+    if (nombre) usuario.nombre = nombre;
+    await guardarPerfil();
+    avisar();
+    return usuario;
+  }
+
+  async function recuperarContrasena(email) {
+    if (!listo && !(await init())) throw new Error("Firebase no está configurado todavía.");
+    await FB().sendPasswordResetEmail(auth, String(email).trim());
+  }
+
   /* ---------- Invitado (anónimo real) ---------- */
   async function entrarComoInvitado(nombre) {
     if (!listo && !(await init())) {
@@ -164,6 +209,9 @@
   window.AuraAuth = {
     init,
     entrarConGoogle,
+    entrarConCorreo,
+    registrarConCorreo,
+    recuperarContrasena,
     entrarComoInvitado,
     vincularGoogle,
     guardarPerfil,

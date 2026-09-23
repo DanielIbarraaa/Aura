@@ -12,8 +12,12 @@ const [appMod, authMod, fsMod, acMod] = await Promise.all([
 
 export const app = appMod.initializeApp(FIREBASE_CONFIG);
 
+const enLocal = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+
 if (APPCHECK_SITE_KEY && !APPCHECK_SITE_KEY.startsWith("REEMPLAZA")) {
   try {
+    // En local, token de depuración: reCAPTCHA no valida localhost.
+    if (enLocal) self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
     acMod.initializeAppCheck(app, {
       provider: new acMod.ReCaptchaEnterpriseProvider(APPCHECK_SITE_KEY),
       isTokenAutoRefreshEnabled: true

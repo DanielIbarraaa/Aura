@@ -79,7 +79,7 @@ LÍMITES
         systemInstruction: SYSTEM,
         generationConfig: {
           temperature: (CFG.ai && CFG.ai.temperature) ?? 0.8,
-          maxOutputTokens: (CFG.ai && CFG.ai.maxOutputTokens) || 320,
+          maxOutputTokens: (CFG.ai && CFG.ai.maxOutputTokens) || 1000,
           topP: 0.95
         },
         safetySettings: [
@@ -107,7 +107,27 @@ LÍMITES
     return h.slice(0, -1);                                 // el último turno se manda aparte
   }
 
+  /* ---- 3b. Cliente Claude, vía Cloud Function ----
+     El teléfono nunca ve la llave de Anthropic: solo llama a la
+     función, que es quien la guarda. */
+  async function replyClaude(memory, ctx) {
+    const FB = window.AuraFB;
+    if (!FB || !FB.getFunctions) throw new Error("SDK sin compilar (corre npm run build:firebase)");
+    const fns = FB.getFunctions(FB.app(), "us-central1");
+    const llamar = FB.httpsCallable(fns, "auroria");
+    const res = await llamar({
+      mensajes: memory.slice(-16)
+        .filter(m => m && m.text)
+        .map(m => ({ sender: m.sender, text: m.text })),
+      nombre: (ctx && ctx.name) || null
+    });
+    const texto = res && res.data && res.data.texto;
+    if (!texto) throw new Error("respuesta vacía");
+    return texto;
+  }
+
   async function reply(memory, ctx) {
+    if (((CFG.ai && CFG.ai.proveedor) || "gemini") === "claude") return replyClaude(memory, ctx);
     const m = ensureModel();
     if (!m) throw initError || new Error("modelo no disponible");
 

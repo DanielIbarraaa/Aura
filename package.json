@@ -16,13 +16,25 @@
     "abrir": "npx cap open android",
     "iconos": "python3 tools/make-icons.py && python3 tools/make-mascota.py",
     "deploy:app": "firebase deploy --only hosting:app",
-    "deploy:todo": "firebase deploy --only hosting,firestore:rules,functions"
+    "deploy:todo": "firebase deploy --only hosting,firestore:rules,functions",
+    "demo": "node tools/seed-demo.mjs"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.1",
     "esbuild": "^0.28.2"
   },
   "dependencies": {
+    "@capacitor-firebase/app-check": "^8.5.1",
+    "@capacitor-firebase/authentication": "^8.5.1",
+    "@capacitor/android": "^8.5.1",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/browser": "^8.0.4",
+    "@capacitor/core": "^8.5.1",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.3",
     "firebase": "^12.18.0"
   }
 }

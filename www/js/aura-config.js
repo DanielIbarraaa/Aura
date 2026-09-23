@@ -15,11 +15,18 @@ window.AURA_CONFIG = {
     appId: "1:659707329464:web:d78844c955e790883ced4d"
   },
   // reCAPTCHA Enterprise (web) / DeviceCheck-Play Integrity (móvil)
-  appCheckSiteKey: "REEMPLAZA_RECAPTCHA_SITE_KEY",
+  appCheckSiteKey: "6Lf9Hq8tAAAAAO6um7gfxHvk2r1YxZizs0os-DCB",
 
   ai: {
+    // "gemini" usa Firebase AI Logic desde el teléfono.
+    // "claude" pasa por la Cloud Function, que es quien guarda la llave.
+    proveedor: "gemini",
     model: "gemini-3.7-flash",   // alternativas: gemini-3.5-flash, gemini-3.5-flash-lite
-    maxOutputTokens: 320,
+
+    // Los modelos 3.x razonan antes de responder y ese razonamiento sale del
+    // MISMO presupuesto de salida. Con 320 tokens el pensamiento se comía casi
+    // todo y las respuestas salían cortadas a media frase. Por eso 1000.
+    maxOutputTokens: 1000,
     temperature: 0.8
   },
 

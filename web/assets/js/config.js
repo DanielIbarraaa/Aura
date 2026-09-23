@@ -10,5 +10,5 @@ export const FIREBASE_CONFIG = {
   appId: "1:659707329464:web:d78844c955e790883ced4d"
 };
 
-export const APPCHECK_SITE_KEY = "REEMPLAZA_RECAPTCHA_SITE_KEY";
+export const APPCHECK_SITE_KEY = "6Lf9Hq8tAAAAAO6um7gfxHvk2r1YxZizs0os-DCB";
 export const SDK = "12.18.0";
