@@ -22,8 +22,16 @@
   const VIEJA_LLAVE = "aura_state_v8";     // de aquí migramos
   const LLAVE_TEMA  = "aura_tema";
 
-  const CAMPOS_DIARIO = ["diarySalt", "diaryCheck", "diaryEntries"];
-  const NO_SE_GUARDAN = ["isLoggedIn"];     // lo dice Firebase Auth, no un campo
+  // El documento "diario" carga todo lo cifrado y la boveda: crece, y no
+  // tiene por que viajar cada vez que alguien mueve el slider del animo.
+  const CAMPOS_DIARIO = ["diarySalt", "diaryCheck", "diaryEntries",
+                         "cripto", "auroriaCifrada"];
+
+  // Ultima linea de defensa. auroriaMemory es la conversacion EN CLARO que
+  // la interfaz necesita en memoria; si algun dia alguien olvida cifrarla
+  // antes de guardar, esta lista impide que llegue al servidor de todos
+  // modos. Lo que se persiste es auroriaCifrada, nunca esto.
+  const NO_SE_GUARDAN = ["isLoggedIn", "auroriaMemory"];
 
   let db = null, uid = null, listo = false;
   let pendiente = null, temporizador = null, guardando = false;
@@ -96,6 +104,28 @@
     await vaciar();
   }
 
+  /* ---------- Borrar de verdad un campo del servidor ----------
+     Las cuentas creadas antes del cifrado v2 tienen la conversacion de
+     aurorIA guardada EN CLARO en privado/estado. Ponerla en la lista de
+     campos prohibidos evita que se vuelva a escribir, pero no borra la
+     que ya esta ahi: setDoc con merge deja intacto lo que no menciona.
+     Para quitarla de verdad hace falta deleteField. */
+  async function olvidarCampos(...campos) {
+    if (!listo || !uid || !campos.length) return false;
+    const fb = FB();
+    if (!fb || !fb.deleteField) return false;
+    const parche = {};
+    for (const c of campos) parche[c] = fb.deleteField();
+    try {
+      await fb.updateDoc(fb.doc(db, "users", uid, "privado", "estado"), parche);
+      console.log("[Aura estado] campos eliminados del servidor:", campos.join(", "));
+      return true;
+    } catch (e) {
+      console.warn("[Aura estado] no se pudieron eliminar:", e.message);
+      return false;
+    }
+  }
+
   /* ---------- migración desde localStorage ---------- */
   /* Corre una sola vez por dispositivo. Si el teléfono trae un estado viejo
      y la nube todavía está vacía, lo sube y borra el rastro local. Si la nube
@@ -131,7 +161,7 @@
   addEventListener("pagehide", () => { if (pendiente) vaciar(); });
 
   window.AuraEstado = {
-    cargar, guardar, sincronizarYa, migrar, tema,
+    cargar, guardar, sincronizarYa, migrar, tema, olvidarCampos,
     get listo() { return listo; },
     get hayPendiente() { return !!pendiente; }
   };

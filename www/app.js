@@ -19,10 +19,15 @@
     isLoggedIn: false,
     theme: "light",
     moodLogs: [],
+    // Esquema viejo (v1). Se conservan solo para poder migrar; una vez
+    // migrado quedan en null y no se vuelven a usar.
     diarySalt: null,
     diaryCheck: null,
+    // Boveda v2: DEK envuelta por el codigo de acceso. Ver js/aura-cripto.js
+    cripto: null,
     diaryEntries: [],
-    auroriaMemory: [],
+    auroriaMemory: [],      // EN CLARO, solo en memoria. Nunca se persiste.
+    auroriaCifrada: null,   // {iv, ct} — esto si viaja al servidor.
     breathingCycles: 0,
     bubblesPopped: 0,
     tippUses: 0,
@@ -30,6 +35,9 @@
     sosEvents: [],
     linkedTherapist: null,
     aiConsent: false,
+    // Registro del consentimiento informado (art. 8 y 15 LFPDPPP).
+    // { versionAviso, terminos, datosSensibles, aceptadoEn, actualizadoEn }
+    consentimiento: null,
     patientId: null
   });
 
@@ -76,6 +84,11 @@
       diaryKey = null;
       diaryUnlocked = false;
       pinBuffer = "";
+
+      // El consentimiento va ANTES de pintar nada: si la persona no ha
+      // consentido el tratamiento de sus datos de salud, no tiene por que
+      // ver primero sus graficas y despues el formulario.
+      await revisarConsentimiento();
 
       applyTheme(state.theme);
       renderHome();
@@ -151,7 +164,13 @@
     if (m.includes("popup-blocked")) return "El navegador bloqueó la ventana. Permite las emergentes e inténtalo de nuevo.";
     if (m.includes("network")) return "Sin conexión. Puedes entrar como invitado.";
     if (m.includes("operation-not-allowed")) return "Falta activar Google en Firebase → Authentication.";
-    if (m.includes("plugin nativo")) return "Google todavía no está listo en Android. Entra como invitado.";
+    if (m.includes("plugin nativo")) return "En la app de Android entra con tu correo; Google solo funciona en el navegador.";
+    if (m.includes("email-already-in-use")) return "Ya existe una cuenta con ese correo. Entra en vez de crearla.";
+    if (m.includes("invalid-credential") || m.includes("wrong-password") || m.includes("user-not-found")) return "Correo o contraseña incorrectos.";
+    if (m.includes("invalid-email")) return "Ese correo no tiene un formato válido.";
+    if (m.includes("weak-password")) return "La contraseña necesita al menos 6 caracteres.";
+    if (m.includes("too-many-requests")) return "Demasiados intentos. Espera unos minutos.";
+    if (m.includes("provider-already-linked") || m.includes("credential-already-in-use")) return "Ese correo ya está vinculado a otra cuenta.";
     if (m.includes("no está configurado")) return "Firebase aún no está configurado. Entra como invitado.";
     return "No se pudo entrar. Inténtalo otra vez.";
   }
@@ -189,6 +208,66 @@
       } finally {
         btnG.disabled = false;
         if (txt) txt.textContent = antes;
+      }
+    });
+
+    // Google no existe dentro del APK sin el plugin nativo: se oculta en vez
+    // de dejar un botón que solo sabe fallar.
+    if (window.AuraAuth && !window.AuraAuth.googleDisponible) {
+      btnG?.classList.add("hidden");
+      $("#dividerCorreo")?.classList.add("hidden");
+    }
+
+    // Correo y contraseña: mismo comportamiento en navegador y en el APK.
+    let modoRegistro = false;
+    const campoNombre = $("#loginNombre");
+    const btnEnviar = $("#emailSubmitBtn");
+    const btnToggle = $("#toggleRegistro");
+
+    function pintarModo() {
+      campoNombre?.classList.toggle("hidden", !modoRegistro);
+      if (btnEnviar) btnEnviar.textContent = modoRegistro ? "Crear cuenta" : "Entrar";
+      if (btnToggle) btnToggle.textContent = modoRegistro ? "Ya tengo cuenta" : "Crear una cuenta";
+      const pass = $("#loginPass");
+      if (pass) pass.autocomplete = modoRegistro ? "new-password" : "current-password";
+    }
+
+    btnToggle?.addEventListener("click", () => { modoRegistro = !modoRegistro; pintarModo(); });
+
+    $("#emailLoginForm")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = $("#loginEmail")?.value.trim();
+      const pass = $("#loginPass")?.value;
+      const nombre = campoNombre?.value.trim();
+      if (!email || !pass) return;
+      const antes = btnEnviar ? btnEnviar.textContent : "";
+      if (btnEnviar) { btnEnviar.disabled = true; btnEnviar.textContent = "Un momento…"; }
+      try {
+        const u = modoRegistro
+          ? await window.AuraAuth.registrarConCorreo(nombre, email, pass)
+          : await window.AuraAuth.entrarConCorreo(email, pass);
+        state.isLoggedIn = true;
+        state.patientId = u.uid || state.patientId;
+        if (u.nombre) state.name = u.nombre;
+        saveState();
+        cerrarOverlay();
+        await hidratar(u);
+        toast(modoRegistro ? "Cuenta creada" : "Sesión iniciada");
+      } catch (err) {
+        toast(errorAuth(err));
+      } finally {
+        if (btnEnviar) { btnEnviar.disabled = false; btnEnviar.textContent = antes; }
+      }
+    });
+
+    $("#olvidePass")?.addEventListener("click", async () => {
+      const email = $("#loginEmail")?.value.trim();
+      if (!email) { toast("Escribe tu correo arriba y vuelve a tocar aquí."); return; }
+      try {
+        await window.AuraAuth.recuperarContrasena(email);
+        toast("Te enviamos un enlace para restablecerla.");
+      } catch (err) {
+        toast(errorAuth(err));
       }
     });
 
@@ -319,6 +398,17 @@
   }
 
   function renderHome() {
+    // El analisis clinico y la curva de animo son datos de salud: sin
+    // consentimiento no se calculan ni se muestran.
+    const ok = puedeTratarSensibles();
+    $("#clinicalCardContainer")?.classList.toggle("hidden", !ok);
+    $("#chartCardContainer")?.classList.toggle("hidden", !ok);
+    const hueco = $("#inicioSinConsent");
+    if (hueco) {
+      hueco.classList.toggle("hidden", ok);
+      if (!ok && !hueco.innerHTML) hueco.innerHTML = tarjetaSinConsentimiento("tu estado de ánimo");
+    }
+
     const hour = new Date().getHours();
     const salute = hour < 12 ? "Buenos días" : hour < 19 ? "Buenas tardes" : "Buenas noches";
     const greetingEl = $("#homeGreeting");
@@ -386,32 +476,126 @@
     `;
   }
 
-  /* Cifrado AES-GCM + PBKDF2 */
-  function b64(buf) { return btoa(String.fromCharCode(...new Uint8Array(buf))); }
-  function unb64(str) { return Uint8Array.from(atob(str), c => c.charCodeAt(0)).buffer; }
+  /* =========================================================
+     Consentimiento informado (RF-15)
 
-  async function deriveKey(pin, saltB64) {
-    const enc = new TextEncoder();
-    const baseKey = await crypto.subtle.importKey("raw", enc.encode(pin), "PBKDF2", false, ["deriveKey"]);
-    return crypto.subtle.deriveKey(
-      { name: "PBKDF2", salt: unb64(saltB64), iterations: 100000, hash: "SHA-256" },
-      baseKey, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]
-    );
+     Se pide al crear cuenta y tambien a quien ya tenia cuenta pero
+     nunca consintio: hasta que lo haga, Aura esta tratando sus datos
+     de salud sin el consentimiento expreso que pide el articulo 8.
+     ========================================================= */
+  const Consent = () => window.AuraConsentimiento;
+
+  /** ¿La persona autorizo el tratamiento de datos de salud? */
+  function puedeTratarSensibles() {
+    const C = Consent();
+    return C ? C.tieneSensibles(state) : true;   // sin el modulo, no se bloquea la app
   }
 
-  async function encryptText(key, text) {
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(text));
-    return { iv: b64(iv), ct: b64(ct) };
+  function pintarConsentimiento() {
+    const C = Consent();
+    const res = $("#consentResumen"), btn = $("#consentToggleBtn");
+    if (!C || !res || !btn) return;
+    const activo = C.tieneSensibles(state);
+    res.textContent = activo ? C.resumen(state) : "No autorizado — tu ánimo y tu diario no se guardan";
+    btn.textContent = activo ? "Retirar" : "Autorizar";
+    btn.style.color = activo ? "#D65A7A" : "";
+    btn.style.borderColor = activo ? "rgba(214,90,122,0.3)" : "";
   }
 
+  async function revisarConsentimiento() {
+    const C = Consent();
+    if (!C || !C.requiere(state)) return;
+    const registro = await C.pedir({
+      alPedirSos: () => { $("#sosOverlay")?.classList.add("open"); runSosBreathe(); }
+    });
+    state.consentimiento = registro;
+    saveState();
+  }
+
+  /** Tarjeta que sustituye a un modulo personal cuando no hay consentimiento. */
+  function tarjetaSinConsentimiento(que) {
+    return `<div class="card glass sin-consent">
+      <h3>Necesitamos tu permiso</h3>
+      <p>Para guardar ${que} necesitamos tu consentimiento expreso, porque es información sobre tu salud. Puedes darlo ahora o seguir usando Calma, el directorio y el botón SOS sin él.</p>
+      <button class="glass-btn primary" data-activar-sensibles>Dar mi consentimiento</button>
+    </div>`;
+  }
+
+  /** Activa el tratamiento de datos sensibles desde cualquier tarjeta. */
+  async function activarSensibles() {
+    const C = Consent();
+    if (!C) return;
+    state.consentimiento = C.actualizarSensibles(state, true);
+    saveState();
+    renderHome(); renderDiary(); renderAurorIA(); renderSettings();
+    computeClinicalData();
+    toast("Consentimiento registrado");
+  }
+
+  /* ---------- Cifrado ----------
+     La criptografia vive en js/aura-cripto.js. Aqui solo quedan los
+     atajos que usa la interfaz. El esquema es de sobre: el codigo de
+     acceso abre una DEK aleatoria, y esa DEK cifra el contenido. Por
+     eso cambiar el codigo no obliga a re-cifrar nada. */
+  const Cripto = () => window.AuraCripto;
+  const b64 = (buf) => Cripto()._b64(buf);
+
+  async function encryptText(key, text) { return Cripto().cifrar(key, text); }
   async function decryptText(key, ivB64, ctB64) {
-    const dec = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(ivB64) }, key, unb64(ctB64));
-    return new TextDecoder().decode(dec);
+    return Cripto().descifrar(key, { iv: ivB64, ct: ctB64 });
+  }
+
+  /* ---------- La conversacion de aurorIA ----------
+     Vive en claro en state.auroriaMemory porque la interfaz y el modelo
+     la necesitan asi, pero NUNCA se persiste de esa forma: aura-estado.js
+     la tiene en su lista de campos prohibidos. Lo que se guarda es
+     state.auroriaCifrada, y solo se puede escribir con la boveda abierta. */
+  async function cifrarConversacion() {
+    if (!diaryKey) return false;
+    try {
+      state.auroriaCifrada = await Cripto().cifrarJSON(diaryKey, state.auroriaMemory || []);
+      return true;
+    } catch (e) {
+      console.warn("[Aura] no se pudo cifrar la conversacion:", e.message);
+      return false;
+    }
+  }
+
+  async function descifrarConversacion() {
+    if (!diaryKey || !state.auroriaCifrada) return;
+    try {
+      const m = await Cripto().descifrarJSON(diaryKey, state.auroriaCifrada);
+      if (Array.isArray(m)) state.auroriaMemory = m;
+    } catch (e) {
+      // Contenido de otra boveda o corrupto: se deja la memoria vacia en
+      // vez de tirar la pantalla. El cifrado original no se toca.
+      console.warn("[Aura] no se pudo descifrar la conversacion:", e.message);
+    }
+  }
+
+  /** Guarda cifrando antes lo que deba ir cifrado. */
+  async function guardarSeguro() {
+    await cifrarConversacion();
+    saveState();
   }
 
   function renderDiary() {
-    const hasPin = !!(state.diarySalt && state.diaryCheck);
+    const lock = $("#diaryLockView"), main = $("#diaryMainView");
+    const hueco = $("#diarioSinConsent");
+    if (!puedeTratarSensibles()) {
+      lock?.classList.add("hidden");
+      main?.classList.add("hidden");
+      $("#vistaRecuperacion")?.classList.add("hidden");
+      if (hueco) { hueco.innerHTML = tarjetaSinConsentimiento("lo que escribas en tu diario"); hueco.classList.remove("hidden"); }
+      return;
+    }
+    hueco?.classList.add("hidden");
+
+    const C = Cripto();
+    // "Ya tiene codigo" incluye las cuentas del esquema viejo: a esas se
+    // les pide su PIN de siempre y la migracion ocurre sola al abrir.
+    const hasPin = C.existe(state.cripto) || C.esV1(state);
+    $("#vistaRecuperacion")?.classList.add("hidden");
     const lockView = $("#diaryLockView");
     const mainView = $("#diaryMainView");
     if (!lockView || !mainView) return;
@@ -424,48 +608,181 @@
       updatePinDots();
       const title = $("#lockTitle");
       const sub = $("#lockSub");
-      if (title) title.textContent = hasPin ? "Diario protegido" : "Crea tu PIN";
-      if (sub) sub.textContent = hasPin ? "Ingresa tu PIN de 4 dígitos" : "Elige un PIN de 4 dígitos para cifrar localmente tus textos";
+      if (title) title.textContent = hasPin ? "Diario protegido" : "Crea tu código";
+      if (sub) {
+        sub.textContent = C.esV1(state)
+          ? "Escribe tu PIN de 4 dígitos — vamos a reforzar tu cifrado"
+          : hasPin
+            ? "Escribe tus 6 dígitos"
+            : "Elige 6 dígitos para cifrar tu diario y tus conversaciones";
+      }
+      // El teclado del esquema viejo sigue siendo de 4 digitos hasta migrar.
+      LARGO_ACTUAL = C.esV1(state) ? 4 : LARGO_CODIGO;
+      pintarPuntos();
     } else {
       renderDiaryEntries();
     }
+  }
+
+  let LARGO_ACTUAL = 6;
+
+  /* El esquema viejo usaba 4 digitos. Mientras una cuenta no migre hay
+     que seguir pidiendole 4, o nunca podria entrar a migrar. */
+  function pintarPuntos() {
+    const cont = $("#pinDots");
+    if (!cont) return;
+    const hay = cont.querySelectorAll("span").length;
+    if (hay !== LARGO_ACTUAL) {
+      cont.innerHTML = "";
+      for (let i = 0; i < LARGO_ACTUAL; i++) cont.appendChild(document.createElement("span"));
+    }
+    updatePinDots();
   }
 
   function updatePinDots() {
     $all("#pinDots span").forEach((dot, i) => dot.classList.toggle("filled", i < pinBuffer.length));
   }
 
+  /* ---------- El candado ----------
+     Tres caminos: crear la boveda, abrirla, o migrar una del esquema
+     viejo. El tercero es el delicado: si algo falla a medio camino no
+     se toca nada, porque del otro lado hay texto del usuario que no
+     tiene copia en ningun otro lado. */
+
+  const LARGO_CODIGO = 6;
+
+  function pinFeedback(msg) {
+    const err = $("#pinError");
+    if (err) err.textContent = msg || "";
+    pinBuffer = "";
+    updatePinDots();
+  }
+
+  function pinOcupado(si) {
+    $all(".pin-pad-grid button").forEach(b => { b.disabled = !!si; });
+    const sub = $("#lockSub");
+    if (si && sub) sub.textContent = "Abriendo…";
+  }
+
   async function handlePinInput(num) {
-    if (pinBuffer.length >= 4) return;
+    if (pinBuffer.length >= LARGO_ACTUAL) return;
     pinBuffer += num;
     updatePinDots();
-    if (pinBuffer.length === 4) {
-      const hasPin = !!(state.diarySalt && state.diaryCheck);
-      if (!hasPin) {
-        const salt = crypto.getRandomValues(new Uint8Array(16));
-        state.diarySalt = b64(salt);
-        const key = await deriveKey(pinBuffer, state.diarySalt);
-        state.diaryCheck = await encryptText(key, "aura_ok");
-        diaryKey = key;
-        diaryUnlocked = true;
-        saveState();
-        toast("PIN configurado con éxito");
-        renderDiary();
+    if (pinBuffer.length !== LARGO_ACTUAL) return;
+
+    const codigo = pinBuffer;
+    const C = Cripto();
+    pinOcupado(true);
+    try {
+      if (C.esV1(state)) {
+        await migrarBoveda(codigo);
+      } else if (C.existe(state.cripto)) {
+        await abrirBoveda(codigo);
       } else {
-        try {
-          const key = await deriveKey(pinBuffer, state.diarySalt);
-          const chk = await decryptText(key, state.diaryCheck.iv, state.diaryCheck.ct);
-          if (chk !== "aura_ok") throw new Error();
-          diaryKey = key;
-          diaryUnlocked = true;
-          renderDiary();
-        } catch {
-          const err = $("#pinError");
-          if (err) err.textContent = "PIN incorrecto.";
-          pinBuffer = "";
-          updatePinDots();
-        }
+        await crearBoveda(codigo);
       }
+    } catch (e) {
+      console.warn("[Aura candado]", e);
+      pinFeedback("Algo salió mal. Intenta de nuevo.");
+    } finally {
+      pinOcupado(false);
+    }
+  }
+
+  async function crearBoveda(codigo) {
+    const { cripto, codigoRecuperacion, llave } = await Cripto().crear(codigo);
+    state.cripto = cripto;
+    diaryKey = llave;
+    diaryUnlocked = true;
+    await guardarSeguro();
+    mostrarCodigoRecuperacion(codigoRecuperacion);
+  }
+
+  async function abrirBoveda(codigo) {
+    const llave = await Cripto().abrir(state.cripto, codigo);
+    if (!llave) { pinFeedback("Código incorrecto."); return; }
+    diaryKey = llave;
+    diaryUnlocked = true;
+    await descifrarConversacion();
+    await rescatarConversacionEnClaro();
+    renderDiary();
+    renderAurorIA();
+  }
+
+  /* Cuentas creadas antes del cifrado v2 traen la conversacion en claro
+     desde el servidor. Al abrir la boveda por primera vez se cifra y se
+     BORRA del servidor: dejarla ahi seria conservar en claro justo lo
+     que este cambio existe para proteger. */
+  async function rescatarConversacionEnClaro() {
+    if (!diaryKey) return;
+    if (!Array.isArray(state.auroriaMemory) || !state.auroriaMemory.length) return;
+    if (state.auroriaCifrada) return;      // ya estaba cifrada, nada que rescatar
+    const ok = await cifrarConversacion();
+    if (!ok) return;
+    saveState();
+    await window.AuraEstado?.sincronizarYa?.();
+    await window.AuraEstado?.olvidarCampos?.("auroriaMemory");
+  }
+
+  /* Migracion del esquema viejo. migrarV1 descifra TODO y lo verifica
+     antes de devolver nada; si una sola entrada falla, lanza y aqui no
+     se escribe una linea. El estado viejo queda como estaba. */
+  async function migrarBoveda(pin) {
+    let r;
+    try {
+      r = await Cripto().migrarV1(state, pin);
+    } catch (e) {
+      if (/PIN no es correcto/.test(e.message)) { pinFeedback("Código incorrecto."); return; }
+      pinFeedback("No se pudo actualizar el cifrado. Tus datos siguen intactos.");
+      console.error("[Aura migracion]", e);
+      return;
+    }
+    state.cripto = r.cripto;
+    state.diaryEntries = r.entradas;
+    state.diarySalt = null;      // el esquema viejo ya no se usa
+    state.diaryCheck = null;
+    diaryKey = r.llave;
+    diaryUnlocked = true;
+    await guardarSeguro();
+    await window.AuraEstado?.sincronizarYa?.();
+    await window.AuraEstado?.olvidarCampos?.("auroriaMemory", "diarySalt", "diaryCheck");
+    toast("Cifrado actualizado");
+    mostrarCodigoRecuperacion(r.codigoRecuperacion);
+  }
+
+  function mostrarCodigoRecuperacion(codigo) {
+    const vista = $("#vistaRecuperacion");
+    const caja = $("#codigoRecuperacion");
+    if (!vista || !caja) { renderDiary(); return; }
+    caja.textContent = codigo;
+    $("#diaryLockView")?.classList.add("hidden");
+    $("#diaryMainView")?.classList.add("hidden");
+    vista.classList.remove("hidden");
+  }
+
+  async function usarCodigoRecuperacion() {
+    const C = Cripto();
+    if (!C.existe(state.cripto)) {
+      toast(C.esV1(state)
+        ? "Escribe tu PIN actual para actualizar el cifrado"
+        : "Todavía no has creado un código");
+      return;
+    }
+    const rec = prompt("Escribe tu código de recuperación:");
+    if (!rec) return;
+    const nuevo = prompt("Ahora elige un código nuevo de 6 dígitos:");
+    if (!nuevo || !/^\d{6}$/.test(nuevo)) { toast("El código debe ser de 6 dígitos"); return; }
+    try {
+      state.cripto = await C.restablecerConRecuperacion(state.cripto, rec, nuevo);
+      diaryKey = await C.abrir(state.cripto, nuevo);
+      diaryUnlocked = true;
+      await descifrarConversacion();
+      await guardarSeguro();
+      toast("Código restablecido");
+      renderDiary();
+      renderAurorIA();
+    } catch (e) {
+      toast(e.message || "No se pudo restablecer");
     }
   }
 
@@ -502,8 +819,16 @@
     const log = $("#chatLog");
     if (!log) return;
     log.innerHTML = "";
+    if (!puedeTratarSensibles()) {
+      log.innerHTML = tarjetaSinConsentimiento("tus conversaciones");
+      return;
+    }
+    if (!diaryUnlocked && state.auroriaCifrada && !state.auroriaMemory.length) {
+      appendBubble("bot", "Tu historial está cifrado. Abre tu diario con tu código para verlo — mientras tanto podemos hablar, y lo que escribas se guardará cuando desbloquees.");
+      return;
+    }
     if (!state.auroriaMemory.length) {
-      appendBubble("bot", `Hola${state.name ? ' ' + state.name : ''}, soy aurorIA. Todo lo que conversemos se queda en tu sesión local con total privacidad. ¿Cómo te sientes hoy?`);
+      appendBubble("bot", `Hola${state.name ? ' ' + state.name : ''}, soy aurorIA. Soy una inteligencia artificial, no una persona. Lo que conversemos se guarda cifrado con tu código: tu especialista no puede leerlo. ¿Cómo te sientes hoy?`);
     } else {
       state.auroriaMemory.forEach(m => appendBubble(m.sender, m.text));
     }
@@ -550,14 +875,14 @@
     if (!text.trim()) return;
     appendBubble("me", text);
     state.auroriaMemory.push({ sender: "me", text });
-    saveState();
+    await guardarSeguro();
 
     // Riesgo inmediato: no lo delegamos a un modelo, se abre el SOS de una vez.
     if (window.AuraAI && window.AuraAI.isCrisis(text)) {
       const reply = window.AuraAI.CRISIS_REPLY;
       appendBubble("bot", reply);
       state.auroriaMemory.push({ sender: "bot", text: reply });
-      saveState();
+      await guardarSeguro();
       $("#sosOverlay")?.classList.add("open");
       runSosBreathe();
       logSos("mencion_en_chat");
@@ -567,11 +892,16 @@
 
     setTyping(true);
     let reply;
+    let motivoLocal = null;
     try {
-      if (window.AuraAI && state.aiConsent && navigator.onLine) {
+      if (!window.AuraAI) motivoLocal = "sdk";
+      else if (!state.aiConsent) motivoLocal = "consentimiento";
+      else if (!navigator.onLine) motivoLocal = "sin_red";
+      else {
         reply = await window.AuraAI.reply(state.auroriaMemory.slice(-16), { name: state.name });
       }
     } catch (e) {
+      motivoLocal = "modelo";
       console.warn("[Aura] aurorIA sin conexión al modelo:", e);
     }
     setTyping(false);
@@ -579,9 +909,54 @@
 
     appendBubble("bot", reply);
     state.auroriaMemory.push({ sender: "bot", text: reply });
-    saveState();
+    await guardarSeguro();
     computeClinicalData();
     pushMetrics("chat");
+
+    // Si contestó el guion local, decir por qué. Una sola vez por sesión:
+    // repetirlo en cada mensaje sería peor que el silencio.
+    if (motivoLocal && !avisoConsentIA) {
+      avisoConsentIA = true;
+      mostrarAvisoIA(motivoLocal);
+    }
+  }
+
+  /* La app respondía con guiones enlatados sin explicar nunca por qué.
+     Aquí se nombra el motivo y, cuando se puede resolver, se ofrece el atajo. */
+  let avisoConsentIA = false;
+
+  function mostrarAvisoIA(motivo) {
+    const log = $("#chatLog");
+    if (!log) return;
+    const div = document.createElement("div");
+    div.className = "aviso-ia";
+
+    if (motivo === "consentimiento") {
+      div.innerHTML = '<span>Estas respuestas son guiones locales. Para que aurorIA converse de verdad, ' +
+        'hay que activar el modelo en la nube.</span>';
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "glass-btn sm";
+      b.textContent = "Activar";
+      b.addEventListener("click", () => {
+        state.aiConsent = true;
+        saveState();
+        renderLink();          // es renderLink quien pinta el interruptor
+        div.remove();
+        avisoConsentIA = false;
+        toast("aurorIA usará el modelo en la nube");
+      });
+      div.appendChild(b);
+    } else if (motivo === "sin_red") {
+      div.innerHTML = "<span>Sin conexión: aurorIA responde con guiones locales. " +
+        "Los ejercicios de Calma y tu diario siguen funcionando igual.</span>";
+    } else {
+      div.innerHTML = "<span>aurorIA no pudo alcanzar el modelo, así que responde con guiones locales. " +
+        "Vuelve a intentarlo en un momento.</span>";
+    }
+
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
   }
 
   function logSos(origen) {
@@ -831,6 +1206,7 @@
   }
 
   function renderSettings() {
+    pintarConsentimiento();
     const nameInput = $("#settingsName");
     const emailInput = $("#settingsEmail");
     const phoneInput = $("#settingsPhone");
@@ -843,24 +1219,29 @@
     applyTheme(state.theme);
   }
 
-  /* Respaldo del diario: sale cifrado, entra cifrado. Sin el PIN no se lee. */
+  /* Respaldo del diario: sale cifrado, entra cifrado. Sin el codigo no
+     se lee. Se incluye la boveda completa (DEK envuelta por el codigo Y
+     por el de recuperacion), asi que el respaldo se abre con cualquiera
+     de los dos — igual que la cuenta. */
   function backupDiary() {
-    if (!state.diarySalt || !state.diaryCheck) {
-      toast("Primero crea tu PIN y una entrada");
+    if (!Cripto().existe(state.cripto)) {
+      toast(Cripto().esV1(state)
+        ? "Abre tu diario una vez para actualizar el cifrado, luego respalda"
+        : "Primero crea tu código y una entrada");
       return;
     }
     const payload = {
-      aura_backup: 1,
+      aura_backup: 2,
       createdAt: new Date().toISOString(),
-      diarySalt: state.diarySalt,
-      diaryCheck: state.diaryCheck,
-      diaryEntries: state.diaryEntries
+      cripto: state.cripto,
+      diaryEntries: state.diaryEntries,
+      auroriaCifrada: state.auroriaCifrada || null
     };
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([JSON.stringify(payload)], { type: "application/json" }));
     a.download = `aura_diario_cifrado_${todayKey()}.json`;
     a.click();
-    toast("Respaldo descargado. Guárdalo junto con tu PIN.");
+    toast("Respaldo descargado. Necesitarás tu código para abrirlo.");
   }
 
   function restoreDiary(file) {
@@ -868,20 +1249,33 @@
     reader.onload = () => {
       try {
         const data = JSON.parse(reader.result);
-        if (data.aura_backup !== 1 || !data.diarySalt || !Array.isArray(data.diaryEntries)) {
-          throw new Error("formato");
+        const v2 = data.aura_backup === 2 && data.cripto;
+        const v1 = data.aura_backup === 1 && data.diarySalt;
+        if ((!v2 && !v1) || !Array.isArray(data.diaryEntries)) throw new Error("formato");
+
+        if (!confirm(`Este respaldo tiene ${data.diaryEntries.length} entradas y reemplaza tu diario actual. Necesitarás el código con el que se creó. ¿Continuar?`)) return;
+
+        if (v2) {
+          state.cripto = data.cripto;
+          state.auroriaCifrada = data.auroriaCifrada || null;
+          state.diarySalt = null;
+          state.diaryCheck = null;
+        } else {
+          // Respaldo del esquema viejo: entra tal cual y se migra sola en
+          // cuanto la persona escriba el PIN con el que se creo.
+          state.cripto = null;
+          state.diarySalt = data.diarySalt;
+          state.diaryCheck = data.diaryCheck;
         }
-        if (!confirm(`Este respaldo tiene ${data.diaryEntries.length} entradas y reemplaza tu diario actual. Necesitarás el PIN con el que se creó. ¿Continuar?`)) return;
-        state.diarySalt = data.diarySalt;
-        state.diaryCheck = data.diaryCheck;
         state.diaryEntries = data.diaryEntries;
+        state.auroriaMemory = [];
         diaryKey = null;
         diaryUnlocked = false;
         pinBuffer = "";
         saveState();
         renderDiary();
         showScreen("diario");
-        toast("Respaldo restaurado. Ingresa el PIN de ese respaldo.");
+        toast("Respaldo restaurado. Escribe el código de ese respaldo.");
       } catch {
         toast("Ese archivo no es un respaldo de Aura");
       }
@@ -950,6 +1344,7 @@
     // Mood slider
     const slider = $("#moodRange");
     slider?.addEventListener("change", () => {
+      if (!puedeTratarSensibles()) { toast("Necesitamos tu consentimiento para guardar esto"); return; }
       const today = todayKey();
       const idx = state.moodLogs.findIndex(m => m.date === today);
       if (idx >= 0) state.moodLogs[idx].value = Number(slider.value);
@@ -973,19 +1368,24 @@
     $("#diarySaveBtn")?.addEventListener("click", async () => {
       const txt = $("#diaryText")?.value.trim();
       if (!txt) return;
+      if (!diaryKey) { toast("Desbloquea tu diario primero"); return; }
       const { iv, ct } = await encryptText(diaryKey, txt);
       state.diaryEntries.push({ id: uid(), date: todayKey(), iv, ct });
-      saveState();
+      await guardarSeguro();
       if ($("#diaryText")) $("#diaryText").value = "";
       renderDiaryEntries();
       computeClinicalData();
       toast("Entrada cifrada y guardada");
     });
 
-    $("#diaryLockNow")?.addEventListener("click", () => {
+    $("#diaryLockNow")?.addEventListener("click", async () => {
+      await cifrarConversacion();   // asegura que lo ultimo quede guardado
+      saveState();
       diaryUnlocked = false;
       diaryKey = null;
+      state.auroriaMemory = [];     // el texto en claro no se queda en RAM
       renderDiary();
+      renderAurorIA();
       toast("Diario bloqueado");
     });
 
@@ -999,9 +1399,44 @@
       }
     });
 
-    $("#clearMemoryBtn")?.addEventListener("click", () => {
+    // Delegado en document: las tarjetas de "sin consentimiento" se pintan
+    // despues de que corre este bloque, asi que un listener directo no las veria.
+    document.addEventListener("click", (e) => {
+      if (e.target.closest("[data-activar-sensibles]")) activarSensibles();
+    });
+
+    $("#consentToggleBtn")?.addEventListener("click", async () => {
+      const C = Consent();
+      if (!C) return;
+      if (C.tieneSensibles(state)) {
+        if (!confirm("Si retiras tu consentimiento dejaremos de guardar tu ánimo, tu diario y tus conversaciones. Lo que ya está guardado se conserva hasta que lo borres desde Ajustes. ¿Continuar?")) return;
+        state.consentimiento = C.actualizarSensibles(state, false);
+        saveState();
+        renderHome(); renderDiary(); renderAurorIA(); pintarConsentimiento();
+        toast("Consentimiento retirado");
+      } else {
+        await activarSensibles();
+      }
+    });
+
+    $("#olvideCodigoBtn")?.addEventListener("click", usarCodigoRecuperacion);
+
+    $("#copiarRecuperacionBtn")?.addEventListener("click", async () => {
+      const t = $("#codigoRecuperacion")?.textContent || "";
+      try { await navigator.clipboard.writeText(t); toast("Código copiado"); }
+      catch { toast("Cópialo a mano: " + t); }
+    });
+
+    $("#guardeRecuperacionBtn")?.addEventListener("click", () => {
+      $("#vistaRecuperacion")?.classList.add("hidden");
+      renderDiary();
+      renderAurorIA();
+    });
+
+    $("#clearMemoryBtn")?.addEventListener("click", async () => {
       if (confirm("¿Reiniciar la memoria de aurorIA?")) {
         state.auroriaMemory = [];
+        state.auroriaCifrada = null;   // sin esto, el cifrado viejo se quedaba
         saveState();
         renderAurorIA();
         computeClinicalData();

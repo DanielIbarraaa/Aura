@@ -73,8 +73,24 @@
       <span>Continuar con Google</span>
     </button>
 
+    <div class="auth-divider" id="dividerCorreo">
+      <span>o con tu correo</span>
+    </div>
+
+    <form id="emailLoginForm" style="display:flex; flex-direction:column; gap:10px;">
+      <input type="text" id="loginNombre" class="input-field hidden" placeholder="Tu nombre o apodo" maxlength="30" autocomplete="name" style="margin-top:0;">
+      <input type="email" id="loginEmail" class="input-field" placeholder="Correo electrónico" autocomplete="email" required style="margin-top:0;">
+      <input type="password" id="loginPass" class="input-field" placeholder="Contraseña" autocomplete="current-password" minlength="6" required style="margin-top:0;">
+      <button type="submit" class="glass-btn primary block" id="emailSubmitBtn" style="font-weight:700;">Entrar</button>
+    </form>
+
+    <div class="auth-links">
+      <button type="button" id="toggleRegistro">Crear una cuenta</button>
+      <button type="button" id="olvidePass">Olvidé mi contraseña</button>
+    </div>
+
     <div class="auth-divider">
-      <span>o ingresa como invitado</span>
+      <span>o entra sin cuenta</span>
     </div>
 
     <form id="guestLoginForm" style="display:flex; flex-direction:column; gap:12px;">
@@ -136,7 +152,9 @@
     </div>
 
     <!-- Mini Análisis Clínico para el Especialista -->
-    <div class="card glass">
+    <div id="inicioSinConsent" class="hidden"></div>
+
+    <div class="card glass" id="clinicalCardContainer">
       <div class="section-head" style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
         <div>
           <h3 style="font-size:16.5px; display:flex; align-items:center; gap:8px;">
@@ -206,13 +224,15 @@
       </div>
     </div>
 
+    <div id="diarioSinConsent" class="hidden"></div>
+
     <div id="diaryLockView">
       <div class="lock-wrap glass card">
         <svg class="icon-lg" style="color:var(--c-purple-shadow);"><use href="#i-lock"/></svg>
-        <h3 id="lockTitle" style="font-size:18px; margin-top:8px;">Crea tu PIN</h3>
-        <p id="lockSub" style="font-size:13px; color:var(--text-soft);">Ingresa 4 dígitos para proteger tu diario.</p>
-        
-        <div class="pin-dots" id="pinDots"><span></span><span></span><span></span><span></span></div>
+        <h3 id="lockTitle" style="font-size:18px; margin-top:8px;">Crea tu código</h3>
+        <p id="lockSub" style="font-size:13px; color:var(--text-soft);">Elige 6 dígitos para cifrar tu diario y tus conversaciones.</p>
+
+        <div class="pin-dots" id="pinDots"><span></span><span></span><span></span><span></span><span></span><span></span></div>
 
         <div class="pin-pad-grid">
           <button data-num="1">1</button>
@@ -230,6 +250,30 @@
           </button>
         </div>
         <div class="pin-error" id="pinError"></div>
+        <button class="enlace-inline" id="olvideCodigoBtn" type="button"
+                style="background:none; border:none; margin-top:14px; font-size:13px; cursor:pointer;">
+          Olvidé mi código
+        </button>
+      </div>
+    </div>
+
+    <!-- Se muestra UNA sola vez, al crear la boveda. No se guarda en ningun lado. -->
+    <div id="vistaRecuperacion" class="hidden">
+      <div class="card glass" style="border:2px solid var(--c-purple-shadow);">
+        <h3 style="font-size:18px;">Guarda este código</h3>
+        <p style="font-size:13px; color:var(--text-soft); margin-top:6px;">
+          Es la única forma de recuperar tu diario si olvidas tu código de 6 dígitos.
+          No lo guardamos en ningún lado: si lo pierdes junto con tu código, tus
+          entradas quedan ilegibles para siempre, también para nosotros.
+        </p>
+        <div id="codigoRecuperacion"
+             style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:17px;
+                    letter-spacing:.06em; text-align:center; padding:16px; margin-top:14px;
+                    border-radius:12px; background:rgba(108,92,231,.08); word-break:break-all;"></div>
+        <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">
+          <button class="glass-btn sm" id="copiarRecuperacionBtn" style="flex:1 1 130px;">Copiar</button>
+          <button class="glass-btn primary sm" id="guardeRecuperacionBtn" style="flex:1 1 130px;">Ya lo guardé</button>
+        </div>
       </div>
     </div>
 
@@ -247,8 +291,8 @@
 
   <!-- ================= 3. AURORIA ================= -->
   <section class="screen" id="screen-auroria">
-    <div class="section-head" style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
-      <div style="display:flex; align-items:center; gap:12px;">
+    <div class="section-head fila-accion">
+      <div class="fila-info">
         <img class="auroria-avatar" src="assets/aurorIA-avatar.png" alt="" width="52" height="52">
         <div>
           <h2>aurorIA</h2>
@@ -441,11 +485,11 @@
     </div>
 
     <div class="card glass">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <div style="display:flex; align-items:center; gap:12px;">
+      <div class="fila-accion">
+        <div class="fila-info">
           <div class="psy-avatar-circle" style="width:44px; height:44px; font-size:15px;"><svg class="icon icon-sm"><use href="#i-user"/></svg></div>
           <div>
-            <strong id="userSessionEmail" style="font-size:14px; display:block; color:var(--text);">Cuenta conectada</strong>
+            <strong id="userSessionEmail" style="font-size:13px; line-height:1.35; display:block; color:var(--text);">Cuenta conectada</strong>
             <span style="font-size:12px; color:var(--text-soft);" id="userSessionStatus">Sesión activa</span>
           </div>
         </div>
@@ -534,6 +578,32 @@
         <div><strong>Borrar todos los datos</strong><p style="font-size:12px; color:#D65A7A;">Acción local irreversible</p></div>
         <svg class="icon icon-sm" style="color:#D65A7A;"><use href="#i-trash"/></svg>
       </div>
+    </div>
+
+    <!-- Legal: obligatorio para las tiendas de apps y para la LFPDPPP. -->
+    <div class="card glass">
+      <div class="section-head" style="margin-bottom:10px;">
+        <h3 style="font-size:15px;">Legal</h3>
+      </div>
+      <!-- Revocar el consentimiento tiene que ser tan facil como darlo:
+           es el derecho del art. 7 de la LFPDPPP, no una cortesia. -->
+      <div class="fila-accion" style="padding:12px 0; border-bottom:1px solid rgba(108,92,231,.12);">
+        <div class="fila-info">
+          <div>
+            <strong style="display:block;">Tratamiento de mis datos de salud</strong>
+            <span style="font-size:12px; color:var(--text-soft);" id="consentResumen">—</span>
+          </div>
+        </div>
+        <button class="glass-btn sm" id="consentToggleBtn">—</button>
+      </div>
+      <a class="settings-row" href="https://aura-2027.web.app/aviso-privacidad.html" target="_blank" rel="noopener" style="text-decoration:none; color:inherit;">
+        <div><strong>Aviso de privacidad</strong><p style="font-size:12px; color:var(--text-soft);">Qué datos guardamos y qué ve tu especialista</p></div>
+        <svg class="icon icon-sm"><use href="#i-shield"/></svg>
+      </a>
+      <a class="settings-row" href="https://aura-2027.web.app/terminos.html" target="_blank" rel="noopener" style="text-decoration:none; color:inherit;">
+        <div><strong>Términos y condiciones</strong><p style="font-size:12px; color:var(--text-soft);">Alcance del servicio y sus límites</p></div>
+        <svg class="icon icon-sm"><use href="#i-shield"/></svg>
+      </a>
     </div>
   </section>
 
@@ -627,6 +697,8 @@
      los módulos de Aura, que esperan encontrar window.AuraFB ya listo. -->
 <script src="vendor/aura-firebase.js"></script>
 <script src="js/aura-auth.js"></script>
+<script src="js/aura-cripto.js"></script>
+<script src="js/aura-consentimiento.js"></script>
 <script src="js/aura-estado.js"></script>
 <script src="js/aura-ai.js"></script>
 <script src="js/aura-sync.js"></script>
