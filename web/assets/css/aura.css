@@ -395,3 +395,89 @@ textarea { resize: vertical; min-height: 110px; line-height: 1.55; }
 .hoja-vistas figcaption { font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
   color: var(--tinta-3); margin-top: 8px; font-weight: 600; }
 @media (max-width: 640px) { .hoja-vistas img { height: 108px; } }
+
+/* ---------- Notas de evolución cifradas ---------- */
+.notas-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap;
+}
+.notas-head h3 { margin: 0; }
+
+.notas-candado {
+  padding: 22px 24px; margin-bottom: 18px;
+  border-radius: 16px;
+  border: 1px solid var(--linea, #e8e4f5);
+  background: rgba(108, 92, 231, 0.04);
+}
+.notas-candado h4 {
+  font-size: 16px; margin: 0 0 8px; color: var(--tinta-1);
+}
+.notas-candado p {
+  font-size: 13.5px; line-height: 1.55; color: var(--tinta-3);
+  max-width: 62ch; margin: 0 0 14px;
+}
+
+/* El bloque del codigo de recuperacion se distingue a proposito: es el
+   unico punto del panel donde perder la informacion es irreversible, y
+   ademas arrastra una obligacion legal de conservacion. */
+.notas-critico {
+  border-color: #E8503F;
+  border-width: 2px;
+  background: rgba(232, 80, 63, 0.04);
+}
+
+.notas-form {
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+}
+.notas-form input[type="password"] {
+  flex: 1 1 200px; min-width: 0;
+  padding: 11px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--linea, #e8e4f5);
+  font-family: var(--ui); font-size: 14px;
+  background: #fff; color: var(--tinta-1);
+}
+.notas-form input[type="password"]:focus {
+  outline: 2px solid var(--lila-500, #6C5CE7); outline-offset: 1px;
+}
+
+.cod-rec {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 17px; letter-spacing: .06em; text-align: center;
+  padding: 16px; margin-bottom: 14px;
+  border-radius: 12px;
+  background: #fff; border: 1px solid var(--linea, #e8e4f5);
+  color: var(--tinta-1); word-break: break-all;
+}
+
+.notas-check {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin-top: 14px; cursor: pointer;
+}
+.notas-check input { flex: 0 0 auto; width: 17px; height: 17px; margin-top: 2px; }
+.notas-check span { font-size: 12.5px; line-height: 1.5; color: var(--tinta-2); }
+
+.notas-err {
+  min-height: 18px; margin: 10px 0 0 !important;
+  font-size: 13px; color: #B4342F;
+}
+.notas-aviso {
+  padding: 12px 16px; margin-bottom: 16px;
+  border-radius: 10px;
+  background: rgba(108, 92, 231, 0.08);
+  font-size: 13px; color: var(--tinta-2);
+}
+
+.enlace-sutil {
+  background: none; border: none; padding: 0; margin-top: 10px;
+  font-family: var(--ui); font-size: 13px;
+  color: var(--lila-500, #6C5CE7); text-decoration: underline; cursor: pointer;
+}
+.btn-sm { padding: 8px 14px; font-size: 13px; }
+
+@media (max-width: 560px) {
+  .notas-candado { padding: 18px 16px; }
+  .notas-form { flex-direction: column; align-items: stretch; }
+  .notas-form input[type="password"], .notas-form .btn { width: 100%; }
+  .cod-rec { font-size: 15px; }
+}

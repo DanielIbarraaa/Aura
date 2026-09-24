@@ -77,7 +77,7 @@ service cloud.firestore {
         && datos().keys().hasOnly(['name', 'cedula', 'especialidad', 'institucion',
                                    'ciudad', 'modalidad', 'whatsapp', 'tarifa',
                                    'email', 'verified', 'activo', 'createdAt',
-                                   'code', 'fcmTokens']);
+                                   'code', 'fcmTokens', 'cripto']);
 
       // Puede editar su perfil, pero nunca su verificación ni su cédula:
       // si la cédula fuera mutable, bastaría verificarse con una real y
@@ -88,7 +88,7 @@ service cloud.firestore {
         && datos().keys().hasOnly(['name', 'cedula', 'especialidad', 'institucion',
                                    'ciudad', 'modalidad', 'whatsapp', 'tarifa',
                                    'email', 'verified', 'activo', 'createdAt',
-                                   'code', 'fcmTokens'])
+                                   'code', 'fcmTokens', 'cripto'])
         && (!('fcmTokens' in datos()) || datos().fcmTokens.size() <= 10);
 
       allow delete: if false;
@@ -166,12 +166,22 @@ service cloud.firestore {
 
       // ---------- Notas de evolución: del terapeuta, privadas ----------
       // El paciente NO entra aquí, ni siquiera a leer.
+      // ---------- Notas de evolucion: cifradas, sin excepcion ----------
+      // Antes esta regla aceptaba 'texto' en claro. Ya no: el servidor
+      // rechaza cualquier nota que no venga cifrada, asi que aunque el
+      // panel tuviera un bug, no hay forma de que texto clinico legible
+      // llegue a Firestore. Las notas viejas en claro se siguen leyendo
+      // (el panel las migra al abrir la boveda), pero no se pueden crear.
+      //
+      // 20000 caracteres de ciphertext en base64 equivalen a ~14 KB de
+      // texto: holgado para una nota de sesion y acotado para que nadie
+      // use el expediente como almacenamiento gratis.
       match /notes/{noteId} {
         allow read, delete: if terapeutaDe(pid);
         allow create, update: if terapeutaDe(pid)
-          && datos().texto is string
-          && datos().texto.size() <= 5000
-          && datos().keys().hasOnly(['texto', 'therapistUid', 'createdAt']);
+          && datos().iv is string && datos().iv.size() <= 32
+          && datos().ct is string && datos().ct.size() <= 20000
+          && datos().keys().hasOnly(['iv', 'ct', 'therapistUid', 'createdAt']);
       }
     }
 

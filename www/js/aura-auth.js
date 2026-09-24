@@ -138,20 +138,25 @@
   }
 
   /* ---------- Invitado (anónimo real) ---------- */
-  async function entrarComoInvitado(nombre) {
-    if (!listo && !(await init())) {
-      // Sin Firebase: sesión puramente local, para no bloquear la app.
-      usuario = { uid: null, anonimo: true, nombre: nombre || "Invitado", email: null, foto: null, proveedor: "local" };
-      avisar();
-      return usuario;
-    }
-    const fb = FB();
-    const out = auth.currentUser || (await fb.signInAnonymously(auth)).user;
-    usuario = perfilDe(out);
-    usuario.nombre = nombre || usuario.nombre || "Invitado";
-    await guardarPerfil();
-    avisar();
-    return usuario;
+  /* ---------- El acceso sin cuenta se retiro ----------
+     Antes se podia entrar como invitado con una sesion anonima. Se quito
+     a proposito, por dos razones que no son de producto:
+
+       1. Sin cuenta no hay forma de devolverle sus datos a nadie. El
+          diario se cifra con un codigo, y si la unica identidad es una
+          sesion anonima atada al navegador, borrar datos del sitio
+          equivale a perder todo sin recuperacion posible.
+       2. El consentimiento del articulo 8 de la LFPDPPP se otorga y se
+          revoca. Un registro de consentimiento que no se puede ligar a
+          una persona identificable no sirve para acreditar nada.
+
+     El boton SOS sigue estando ANTES del login: quien llega en crisis no
+     tiene que registrarse para llegar a la ayuda.
+
+     Las sesiones anonimas que ya existan siguen funcionando y pueden
+     vincularse a una cuenta real con vincularGoogle(). */
+  async function entrarComoInvitado() {
+    throw new Error("Aura ya no permite entrar sin cuenta. Regístrate con Google o con tu correo.");
   }
 
   /** Convierte la sesión de invitado en cuenta de Google conservando el uid. */

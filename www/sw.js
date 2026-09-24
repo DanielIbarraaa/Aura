@@ -5,11 +5,11 @@
    El handler de 'activate' borra todo cache cuyo nombre no sea este; si el
    nombre no cambia, el cache viejo sobrevive y el navegador sigue sirviendo
    codigo anterior aunque el deploy haya salido bien. */
-const CACHE = 'aura-v11';
+const CACHE = 'aura-v12';
 const ASSETS = [
   './', './index.html', './style.css', './app.js', './manifest.json',
   './js/aura-config.js', './js/aura-auth.js', './js/aura-estado.js',
-  './js/aura-cripto.js', './js/aura-consentimiento.js', './js/aura-ai.js', './js/aura-sync.js', './js/aura-directorio.js',
+  './js/aura-cripto.js', './js/aura-foto.js', './js/aura-consentimiento.js', './js/aura-ai.js', './js/aura-sync.js', './js/aura-directorio.js',
   './vendor/aura-firebase.js',
   './icon-192.png', './icon-512.png', './favicon-32.png',
   './icons/maskable-192.png', './icons/maskable-512.png', './icons/apple-touch-icon.png',

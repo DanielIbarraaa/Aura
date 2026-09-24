@@ -88,14 +88,74 @@
       </div>
 
       <div class="bloque-panel">
-        <h3>Notas de evolución</h3>
-        <p style="font-size:13.5px; color:var(--tinta-3); max-width:64ch; margin-bottom:14px;">Privadas. El paciente no las ve desde la app.</p>
-        <form id="formNota" style="display:flex; flex-direction:column; gap:12px; margin-bottom:22px;">
-          <label class="sr" for="notaTexto">Nueva nota de evolución</label>
-          <textarea id="notaTexto" placeholder="Qué se trabajó en sesión, qué se acordó, qué observar la próxima vez…"></textarea>
-          <button class="btn btn-primario" type="submit" style="align-self:flex-start">Guardar nota</button>
-        </form>
-        <div id="notas"></div>
+        <div class="notas-head">
+          <h3>Notas de evolución</h3>
+          <button class="btn btn-linea btn-sm" id="btnExportar" type="button" hidden>Exportar expediente</button>
+        </div>
+        <p style="font-size:13.5px; color:var(--tinta-3); max-width:64ch; margin-bottom:14px;">
+          Privadas y cifradas con tu código. El paciente no las ve, y el servidor tampoco.
+        </p>
+
+        <!-- Crear la boveda: primera vez del especialista -->
+        <div id="notasCrear" class="notas-candado" hidden>
+          <h4>Crea tu código de notas</h4>
+          <p>Tus notas se van a cifrar en tu navegador antes de salir. Elige un código de al menos 6 caracteres; puedes usar una frase.</p>
+          <div class="notas-form">
+            <label class="sr" for="codNuevo">Código nuevo</label>
+            <input type="password" id="codNuevo" placeholder="Tu código" autocomplete="new-password">
+            <label class="sr" for="codNuevo2">Repite el código</label>
+            <input type="password" id="codNuevo2" placeholder="Repítelo" autocomplete="new-password">
+            <button class="btn btn-primario" id="btnCrearBoveda" type="button">Crear</button>
+          </div>
+          <p class="notas-err" id="errCrear"></p>
+        </div>
+
+        <!-- Codigo de recuperacion: obligatorio, no se puede saltar -->
+        <div id="notasRecuperacion" class="notas-candado notas-critico" hidden>
+          <h4>Guarda este código antes de continuar</h4>
+          <p>
+            Es la única forma de recuperar tus notas si olvidas tu código. No lo guardamos
+            en ningún lado. <strong>La NOM-004 te obliga a conservar el expediente cinco años
+            desde el último acto</strong>, así que esto no es opcional: guárdalo donde guardas
+            lo importante.
+          </p>
+          <div class="cod-rec" id="codRecuperacion"></div>
+          <div class="notas-form">
+            <button class="btn btn-linea" id="btnCopiarRec" type="button">Copiar</button>
+            <button class="btn btn-primario" id="btnConfirmarRec" type="button" disabled>Ya lo guardé</button>
+          </div>
+          <label class="notas-check">
+            <input type="checkbox" id="chkGuardeRec">
+            <span>Lo guardé en un lugar seguro y entiendo que sin él, y sin mi código, mis notas no se pueden recuperar.</span>
+          </label>
+        </div>
+
+        <!-- Abrir la boveda en cada sesion -->
+        <div id="notasAbrir" class="notas-candado" hidden>
+          <h4>Tus notas están cifradas</h4>
+          <p>Escribe tu código para verlas y escribir nuevas.</p>
+          <div class="notas-form">
+            <label class="sr" for="codAbrir">Tu código</label>
+            <input type="password" id="codAbrir" placeholder="Tu código" autocomplete="current-password">
+            <button class="btn btn-primario" id="btnAbrirBoveda" type="button">Abrir</button>
+          </div>
+          <p class="notas-err" id="errAbrir"></p>
+          <button class="enlace-sutil" id="btnOlvideCod" type="button">Olvidé mi código</button>
+        </div>
+
+        <!-- Notas, ya abiertas -->
+        <div id="notasContenido" hidden>
+          <form id="formNota" style="display:flex; flex-direction:column; gap:12px; margin-bottom:22px;">
+            <label class="sr" for="notaTexto">Nueva nota de evolución</label>
+            <textarea id="notaTexto" placeholder="Qué se trabajó en sesión, qué se acordó, qué observar la próxima vez…"></textarea>
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+              <button class="btn btn-primario" type="submit">Guardar nota</button>
+              <button class="btn btn-linea btn-sm" id="btnCerrarBoveda" type="button">Cerrar notas</button>
+            </div>
+          </form>
+          <div id="avisoMigracion" class="notas-aviso" hidden></div>
+          <div id="notas"></div>
+        </div>
       </div>
 
       <p class="legal" style="margin-top:44px">Estas métricas son un apoyo para la consulta, no un instrumento diagnóstico ni un sistema de monitoreo en tiempo real. Aura no atiende urgencias: si un paciente está en riesgo, actúa por tus canales clínicos habituales.</p>
@@ -127,6 +187,7 @@
   });
 })();
 </script>
+<script src="assets/js/aura-cripto.js"></script>
 <script type="module" src="assets/js/panel.js"></script>
 </body>
 </html>

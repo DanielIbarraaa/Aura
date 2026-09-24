@@ -1,9 +1,13 @@
 import { auth, db, A, F, requireAuth } from "./firebase.js";
 import { dibujarAnimo, tablaAnimo } from "./grafica.js";
+import * as Notas from "./notas.js";
 
 const $ = (s) => document.querySelector(s);
 let uid = null, pacienteActivo = null, metricas = null, dias = 14, verTabla = false;
 let offMetricas = null, offNotas = null;
+let miPerfil = null;          // therapists/{uid}, incluye la boveda
+let notasCrudas = [];         // los documentos tal como llegan, ya cifrados
+let pacienteAlias = null;
 
 const fmtFecha = (ts) => {
   if (!ts) return "—";
@@ -31,6 +35,7 @@ if (!perfil.exists()) {
   location.replace("registro.html");
 } else {
   const p = perfil.data();
+  miPerfil = p;                     // trae la boveda de notas
   $("#miNombre").textContent = p.name || user.email;
   $("#miCodigo").textContent = p.code || "AUR-••••••";
   $("#codigoInline").textContent = p.code || "AUR-••••••";
@@ -73,6 +78,7 @@ function abrirPaciente(id, datos) {
   pacienteActivo = id;
   $("#sinSeleccion").classList.add("oculto");
   $("#expediente").classList.remove("oculto");
+  pacienteAlias = datos.alias || null;
   $("#pacNombre").textContent = datos.alias || `Paciente ${id.slice(0, 4).toUpperCase()}`;
   $("#pacCodigo").textContent = datos.code || "—";
   $("#pacVisto").textContent = fmtFecha(datos.lastSeen);
@@ -88,13 +94,101 @@ function abrirPaciente(id, datos) {
   offNotas = F.onSnapshot(
     F.query(F.collection(db, "patients", id, "notes"), F.orderBy("createdAt", "desc")),
     (s) => {
-      $("#notas").innerHTML = s.empty
-        ? `<p style="font-size:14px; color:var(--tinta-3);">Sin notas todavía.</p>`
-        : s.docs.map(d => {
-            const n = d.data();
-            return `<div class="nota"><div class="fh">${n.createdAt ? fmtHora(n.createdAt) : "—"}</div><p>${escapar(n.texto)}</p></div>`;
-          }).join("");
+      // Lo que llega esta cifrado. Se guarda crudo y se pinta solo si la
+      // boveda esta abierta; sin ella no hay nada que mostrar.
+      notasCrudas = s.docs.map(d => Object.assign({ id: d.id }, d.data()));
+      pintarNotas();
     }, (e) => console.warn("[panel] notas:", e.message));
+}
+
+/* =========================================================
+   Notas de evolucion cifradas
+
+   El panel entero funciona sin abrir la boveda: las metricas, el animo
+   y el historial de SOS no estan cifrados porque el especialista los
+   necesita para trabajar. Lo unico que exige codigo son las notas, que
+   es el texto clinico.
+   ========================================================= */
+
+function vista(cual) {
+  for (const k of ["notasCrear", "notasRecuperacion", "notasAbrir", "notasContenido"]) {
+    const el = $("#" + k);
+    if (el) el.hidden = (k !== cual);
+  }
+  const exp = $("#btnExportar");
+  if (exp) exp.hidden = (cual !== "notasContenido");
+}
+
+function decidirVistaNotas() {
+  if (!miPerfil) return;
+  if (!Notas.tieneBoveda(miPerfil)) return vista("notasCrear");
+  if (!Notas.abierta()) return vista("notasAbrir");
+  vista("notasContenido");
+}
+
+async function pintarNotas() {
+  const cont = $("#notas");
+  if (!cont) return;
+  decidirVistaNotas();
+  if (!Notas.abierta()) return;
+
+  if (!notasCrudas.length) {
+    cont.innerHTML = `<p style="font-size:14px; color:var(--tinta-3);">Sin notas todavía.</p>`;
+    return;
+  }
+
+  const partes = [];
+  let ilegibles = 0;
+  for (const n of notasCrudas) {
+    const texto = await Notas.descifrarNota(n);
+    const fecha = n.createdAt ? fmtHora(n.createdAt) : "—";
+    if (texto === null) {
+      ilegibles++;
+      partes.push(`<div class="nota"><div class="fh">${fecha}</div><p style="color:#B4342F;">Esta nota no se pudo descifrar. Puede venir de otra bóveda.</p></div>`);
+    } else {
+      partes.push(`<div class="nota"><div class="fh">${fecha}</div><p>${escapar(texto)}</p></div>`);
+    }
+  }
+  cont.innerHTML = partes.join("");
+  if (ilegibles) console.warn("[panel] notas ilegibles:", ilegibles);
+
+  await migrarNotasEnClaro();
+}
+
+/* Las notas escritas antes del cifrado siguen en claro en el servidor.
+   Se convierten en cuanto hay bóveda abierta: dejarlas ahi seria
+   conservar en claro justo el texto que esto existe para proteger. */
+async function migrarNotasEnClaro() {
+  const pendientes = notasCrudas.filter(Notas.esEnClaro);
+  const aviso = $("#avisoMigracion");
+  if (!pendientes.length) { if (aviso) aviso.hidden = true; return; }
+
+  if (aviso) {
+    aviso.hidden = false;
+    aviso.textContent = `Cifrando ${pendientes.length} nota${pendientes.length > 1 ? "s" : ""} que venían del esquema anterior…`;
+  }
+
+  let hechas = 0, fallidas = 0;
+  for (const n of pendientes) {
+    try {
+      const sobre = await Notas.migrarNota(n);
+      if (!sobre) continue;
+      await F.setDoc(
+        F.doc(db, "patients", pacienteActivo, "notes", n.id),
+        { iv: sobre.iv, ct: sobre.ct, therapistUid: n.therapistUid || uid, createdAt: n.createdAt }
+      );
+      hechas++;
+    } catch (e) {
+      fallidas++;
+      console.warn("[panel] no se pudo migrar la nota", n.id, e.message);
+    }
+  }
+  if (aviso) {
+    aviso.textContent = fallidas
+      ? `Se cifraron ${hechas} notas. ${fallidas} no se pudieron convertir y siguen como estaban.`
+      : `Listo: ${hechas} nota${hechas > 1 ? "s" : ""} quedaron cifradas.`;
+    setTimeout(() => { aviso.hidden = true; }, 6000);
+  }
 }
 
 const escapar = (s) => (s || "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -183,6 +277,7 @@ $("#btnRenombrar").addEventListener("click", async () => {
   const nuevo = prompt("¿Con qué nombre quieres ver a este paciente en tu panel?", actual === "—" ? "" : actual);
   if (nuevo === null) return;
   await F.updateDoc(F.doc(db, "patients", pacienteActivo), { alias: nuevo.trim() || null });
+  pacienteAlias = nuevo.trim() || null;
   $("#pacNombre").textContent = nuevo.trim() || "Paciente";
 });
 
@@ -190,10 +285,128 @@ $("#formNota").addEventListener("submit", async (e) => {
   e.preventDefault();
   const texto = $("#notaTexto").value.trim();
   if (!texto || !pacienteActivo) return;
+  if (!Notas.abierta()) { alert("Abre tu bóveda de notas primero."); return; }
+
+  // El texto se cifra AQUI. Lo que viaja son bytes; en ningun momento
+  // sale la nota en claro hacia el servidor.
+  const sobre = await Notas.cifrarNota(texto);
   await F.addDoc(F.collection(db, "patients", pacienteActivo, "notes"), {
-    texto, therapistUid: uid, createdAt: F.serverTimestamp()
+    iv: sobre.iv, ct: sobre.ct, therapistUid: uid, createdAt: F.serverTimestamp()
   });
   $("#notaTexto").value = "";
 });
 
 addEventListener("resize", () => { if (metricas && !verTabla) pintarExpediente(); });
+
+
+/* ---------- Controles de la bóveda de notas ---------- */
+
+function errCrear(m) { const e = $("#errCrear"); if (e) e.textContent = m || ""; }
+function errAbrir(m) { const e = $("#errAbrir"); if (e) e.textContent = m || ""; }
+
+$("#btnCrearBoveda")?.addEventListener("click", async () => {
+  const a = $("#codNuevo").value, b = $("#codNuevo2").value;
+  errCrear("");
+  if (a.length < 6) return errCrear("Usa al menos 6 caracteres.");
+  if (a !== b) return errCrear("Los dos códigos no coinciden.");
+
+  const btn = $("#btnCrearBoveda");
+  btn.disabled = true; btn.textContent = "Creando…";
+  try {
+    const { cripto, codigoRecuperacion } = await Notas.crearBoveda(a);
+    await F.updateDoc(F.doc(db, "therapists", uid), { [Notas.CAMPO_BOVEDA]: cripto });
+    miPerfil = Object.assign({}, miPerfil, { [Notas.CAMPO_BOVEDA]: cripto });
+    $("#codNuevo").value = ""; $("#codNuevo2").value = "";
+    $("#codRecuperacion").textContent = codigoRecuperacion;
+    $("#chkGuardeRec").checked = false;
+    $("#btnConfirmarRec").disabled = true;
+    vista("notasRecuperacion");
+  } catch (e) {
+    errCrear(e.message || "No se pudo crear la bóveda.");
+  } finally {
+    btn.disabled = false; btn.textContent = "Crear";
+  }
+});
+
+// La confirmacion es obligatoria: sin marcar la casilla no se avanza.
+// Del lado del paciente esto seria paternalista; aqui no, porque perder
+// el codigo lo deja sin el expediente que esta obligado a conservar.
+$("#chkGuardeRec")?.addEventListener("change", (e) => {
+  $("#btnConfirmarRec").disabled = !e.target.checked;
+});
+
+$("#btnCopiarRec")?.addEventListener("click", async () => {
+  const t = $("#codRecuperacion").textContent || "";
+  try { await navigator.clipboard.writeText(t); $("#btnCopiarRec").textContent = "Copiado"; }
+  catch { /* sin permiso de portapapeles: que lo copie a mano */ }
+  setTimeout(() => { $("#btnCopiarRec").textContent = "Copiar"; }, 2000);
+});
+
+$("#btnConfirmarRec")?.addEventListener("click", () => {
+  $("#codRecuperacion").textContent = "";   // no se queda en el DOM
+  pintarNotas();
+});
+
+$("#btnAbrirBoveda")?.addEventListener("click", abrirBoveda);
+$("#codAbrir")?.addEventListener("keydown", (e) => { if (e.key === "Enter") abrirBoveda(); });
+
+async function abrirBoveda() {
+  const cod = $("#codAbrir").value;
+  errAbrir("");
+  if (!cod) return;
+  const btn = $("#btnAbrirBoveda");
+  btn.disabled = true; btn.textContent = "Abriendo…";
+  try {
+    const ok = await Notas.abrir(miPerfil, cod);
+    if (!ok) { errAbrir("Código incorrecto."); return; }
+    $("#codAbrir").value = "";
+    await pintarNotas();
+  } finally {
+    btn.disabled = false; btn.textContent = "Abrir";
+  }
+}
+
+$("#btnCerrarBoveda")?.addEventListener("click", () => {
+  Notas.cerrar();
+  $("#notas").innerHTML = "";
+  decidirVistaNotas();
+});
+
+$("#btnOlvideCod")?.addEventListener("click", async () => {
+  const rec = prompt("Escribe tu código de recuperación:");
+  if (!rec) return;
+  const nuevo = prompt("Ahora elige un código nuevo (mínimo 6 caracteres):");
+  if (!nuevo || nuevo.length < 6) { alert("El código debe tener al menos 6 caracteres."); return; }
+  try {
+    const cripto = await Notas.restablecer(miPerfil, rec, nuevo);
+    await F.updateDoc(F.doc(db, "therapists", uid), { [Notas.CAMPO_BOVEDA]: cripto });
+    miPerfil = Object.assign({}, miPerfil, { [Notas.CAMPO_BOVEDA]: cripto });
+    await pintarNotas();
+  } catch (e) {
+    errAbrir(e.message || "No se pudo restablecer.");
+  }
+});
+
+/* Exportacion del expediente en claro. Es lo que hace que cifrar sea
+   compatible con el deber de conservar de la NOM-004: el especialista
+   se lleva su copia y la resguarda donde guarda sus expedientes. */
+$("#btnExportar")?.addEventListener("click", async () => {
+  if (!Notas.abierta() || !pacienteActivo) return;
+  const btn = $("#btnExportar");
+  btn.disabled = true; btn.textContent = "Preparando…";
+  try {
+    const conFecha = notasCrudas.map(n => Object.assign({}, n, {
+      fechaLegible: n.createdAt ? fmtHora(n.createdAt) : "—"
+    }));
+    const { contenido, ilegibles } = await Notas.exportarExpediente(
+      { alias: pacienteAlias, id: pacienteActivo }, conFecha
+    );
+    const hoy = new Date().toISOString().slice(0, 10);
+    Notas.descargar(`expediente_${(pacienteAlias || pacienteActivo).replace(/\W+/g, "_")}_${hoy}.txt`, contenido);
+    if (ilegibles) alert(`Se exportó el expediente. Ojo: ${ilegibles} nota(s) no se pudieron descifrar y quedaron marcadas en el archivo.`);
+  } catch (e) {
+    alert(e.message || "No se pudo exportar.");
+  } finally {
+    btn.disabled = false; btn.textContent = "Exportar expediente";
+  }
+});

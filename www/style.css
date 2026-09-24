@@ -25,19 +25,49 @@
   --bg-0: #F3F1FA;
   --bg-1: #FFFFFF;
   --text: #342852;
-  --text-soft: #635785;
-  --text-mute: #867BB8;
+  /* Estos dos bajaron de tono al adelgazar el vidrio.
+     El cristal al 38% sobre la aurora compone un lavanda de luminancia
+     ~0.40, no el blanco casi puro de antes. Sobre ese fondo, el #867BB8
+     original se quedaba en 1.2:1 — practicamente invisible. Los valores
+     de aqui son los mas claros que todavia alcanzan 4.5:1 (AA) medido
+     sobre los pixeles reales, no sobre el color declarado de la tarjeta.
+
+     Se pierde algo de jerarquia por tono: la diferencia con --text queda
+     chica. La jerarquia la cargan el tamano y el peso, que es como debe
+     ser cuando el fondo no es solido. */
+  --text-soft: #3E3357;
+  --text-mute: #43375C;
 
   --accent-grad: linear-gradient(135deg, #867BB8 0%, #B7B2EA 50%, #D6A6CE 100%);
   --accent-gold: linear-gradient(135deg, #EEDAA2, #D6A6CE);
   --accent-mint: linear-gradient(135deg, #A3D9D2, #95BAE8);
   --accent-sos: linear-gradient(135deg, #D65A7A 0%, #D6A6CE 100%);
 
-  --glass-bg: rgba(255, 255, 255, 0.75);
-  --glass-bg-strong: rgba(216, 212, 251, 0.45);
-  --glass-border: rgba(183, 178, 234, 0.55);
-  --glass-shadow: 0 12px 30px rgba(134, 123, 184, 0.12);
-  --glass-highlight: rgba(255, 255, 255, 0.95);
+  /* Vidrio liquido.
+     El 0.75 anterior no era vidrio: era una tarjeta blanca con un poco de
+     desenfoque detras. Con la aurora animada del fondo tapada al 75%, el
+     efecto se perdia entero. A 0.38 el color de atras atraviesa y se
+     mueve con ella, que es de donde sale la sensacion de vidrio.
+
+     La saturacion alta compensa lo que el desenfoque apaga: sin ella, un
+     fondo de color se vuelve gris lechoso al pasar por el cristal. */
+  /* 0.56, no 0.38. Se midio el contraste real sobre los pixeles pintados
+     barriendo opacidades: por debajo de 0.56 el texto chico cae bajo los
+     4.5:1 de WCAG AA y deja de leerse sobre el cristal. Sigue siendo mucho
+     mas transparente que el 0.75 anterior — la diferencia se ve — pero
+     tener texto ilegible no es una opcion de diseno. */
+  --glass-bg: rgba(255, 255, 255, 0.56);
+  --glass-bg-strong: rgba(255, 255, 255, 0.64);
+  --glass-border: rgba(255, 255, 255, 0.70);
+  --glass-shadow: 0 10px 34px rgba(134, 123, 184, 0.16), 0 2px 8px rgba(134, 123, 184, 0.08);
+  --glass-highlight: rgba(255, 255, 255, 1);
+  --glass-filtro: blur(26px) saturate(190%) brightness(1.06);
+  --glass-brillo: linear-gradient(150deg,
+      rgba(255,255,255,.62) 0%,
+      rgba(255,255,255,.18) 30%,
+      rgba(255,255,255,0)   56%);
+  --glass-borde-luz: rgba(255, 255, 255, 0.95);
+  --glass-borde-sombra: rgba(134, 123, 184, 0.30);
 
   --divider: rgba(183, 178, 234, 0.3);
   --canvas-bg: #FFFFFF;
@@ -61,11 +91,20 @@
   --text-soft: #D8D4FB;
   --text-mute: #B7B2EA;
 
-  --glass-bg: rgba(40, 33, 61, 0.6);
-  --glass-bg-strong: rgba(134, 123, 184, 0.25);
-  --glass-border: rgba(183, 178, 234, 0.25);
-  --glass-shadow: 0 16px 36px rgba(10, 8, 20, 0.5);
-  --glass-highlight: rgba(255, 255, 255, 0.08);
+  /* En oscuro el brillo tiene que ser mas tenue o el borde se ve como
+     una linea de neon pegada encima, no como luz rebotando en un canto. */
+  --glass-bg: rgba(60, 50, 92, 0.34);
+  --glass-bg-strong: rgba(134, 123, 184, 0.30);
+  --glass-border: rgba(216, 212, 251, 0.30);
+  --glass-shadow: 0 14px 40px rgba(10, 8, 20, 0.55), 0 2px 8px rgba(10, 8, 20, 0.3);
+  --glass-highlight: rgba(255, 255, 255, 0.28);
+  --glass-filtro: blur(26px) saturate(180%) brightness(1.18);
+  --glass-brillo: linear-gradient(150deg,
+      rgba(255,255,255,.20) 0%,
+      rgba(255,255,255,.06) 30%,
+      rgba(255,255,255,0)   56%);
+  --glass-borde-luz: rgba(255, 255, 255, 0.42);
+  --glass-borde-sombra: rgba(10, 8, 20, 0.35);
 
   --divider: rgba(183, 178, 234, 0.15);
   --canvas-bg: #1D182E;
@@ -107,13 +146,38 @@ button { cursor: pointer; border: none; background: none; }
 
 /* Glass Primitives */
 .glass {
+  position: relative;
   background: var(--glass-bg);
-  backdrop-filter: blur(20px) saturate(150%);
-  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  backdrop-filter: var(--glass-filtro);
+  -webkit-backdrop-filter: var(--glass-filtro);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+  /* Tres capas de luz, no una:
+       1 y 2. sombra exterior, para que la pieza flote sobre el fondo
+       3. linea clara en el canto superior: el reflejo del cielo
+       4. linea oscura en el canto inferior: el grosor del cristal
+     Sin la cuarta la pieza se ve pegada; con ella se ve que tiene canto. */
+  box-shadow:
+    var(--glass-shadow),
+    inset 0 1px 0 var(--glass-highlight),
+    inset 0 -1px 0 var(--glass-borde-sombra);
+  isolation: isolate;
 }
+
+/* El brillo especular: la banda de luz que cruza el cristal en diagonal.
+   Va en un pseudo-elemento y no en el background para que no se mezcle
+   con el color de fondo y se pueda apagar pieza por pieza. */
+.glass::before {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  background: var(--glass-brillo);
+  pointer-events: none;
+  z-index: 0;
+}
+/* El contenido va por encima del brillo. Sin esto el destello queda
+   encima del texto y lo lava en la esquina superior izquierda. */
+.glass > * { position: relative; z-index: 1; }
 .glass-pill { border-radius: var(--radius-pill); }
 .glass-sm { border-radius: var(--radius-sm); }
 
@@ -471,7 +535,7 @@ button { cursor: pointer; border: none; background: none; }
   width: 100%; margin-top: 14px; padding: 10px 12px;
   background: rgba(214, 90, 122, 0.12); border: 1px solid rgba(214, 90, 122, 0.32);
   border-radius: var(--radius-md); cursor: pointer;
-  font-size: 12.5px; font-weight: 700; font-family: inherit; color: #8A2B43;
+  font-size: 12.5px; font-weight: 700; font-family: inherit; color: #721D32;
   transition: background .2s ease;
 }
 .auth-sos-link:hover { background: rgba(214, 90, 122, 0.2); }
@@ -673,4 +737,128 @@ button { cursor: pointer; border: none; background: none; }
   .consent-cuerpo { margin-bottom: 10px; }
   .consent-acciones { margin-top: 10px; }
   .consent-sos { margin-top: 7px; font-size: 11.5px; }
+}
+
+/* ---------- Vidrio líquido: brillo en botones y piezas chicas ---------- */
+
+/* Los botones tambien son cristal, con un destello mas corto para que la
+   luz se vea "mas cerca" de la superficie que en una tarjeta grande. */
+.glass-btn {
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  box-shadow:
+    0 2px 10px rgba(134, 123, 184, 0.14),
+    inset 0 1px 0 var(--glass-highlight),
+    inset 0 -1px 0 var(--glass-borde-sombra);
+}
+.glass-btn::before {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(160deg, rgba(255,255,255,.55) 0%, rgba(255,255,255,.10) 42%, transparent 62%);
+  pointer-events: none;
+}
+.glass-btn > * { position: relative; z-index: 1; }
+
+.glass-btn:hover {
+  box-shadow:
+    0 4px 16px rgba(134, 123, 184, 0.22),
+    inset 0 1px 0 var(--glass-highlight),
+    inset 0 -1px 0 var(--glass-borde-sombra);
+}
+
+/* La aurora del fondo es la que le da color al cristal. Subirle la
+   opacidad y el tamano hace que haya algo que refractar: sobre un fondo
+   plano, el vidrio mas transparente del mundo se ve igual que una caja
+   gris. */
+.aurora span { opacity: 0.55; }
+.aurora .b3 { opacity: 0.40; }
+[data-theme="dark"] .aurora span { opacity: 0.42; }
+[data-theme="dark"] .aurora .b3 { opacity: 0.30; }
+
+/* Navegador sin backdrop-filter (Firefox viejo, algunos WebView): sin el
+   desenfoque, un fondo al 38% deja el texto ilegible. Se sube la opacidad
+   solo en ese caso. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root { --glass-bg: rgba(255, 255, 255, 0.88); --glass-bg-strong: rgba(255, 255, 255, 0.92); }
+  [data-theme="dark"] { --glass-bg: rgba(40, 33, 61, 0.90); --glass-bg-strong: rgba(60, 50, 92, 0.92); }
+  .glass::before, .glass-btn::before { display: none; }
+}
+
+/* Quien pidió menos movimiento no necesita blobs flotando detrás del
+   cristal; el vidrio se queda, la animación no. */
+@media (prefers-reduced-motion: reduce) {
+  .aurora span { animation: none !important; }
+}
+
+/* ---------- Avatar de perfil ---------- */
+.avatar-perfil {
+  position: relative;
+  flex: 0 0 auto;
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(14px) saturate(180%);
+  -webkit-backdrop-filter: blur(14px) saturate(180%);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 2px 10px rgba(134,123,184,.16);
+  cursor: pointer; overflow: hidden; padding: 0;
+  transition: transform .18s var(--ease), box-shadow .2s ease;
+}
+.avatar-perfil:hover { transform: scale(1.04); }
+.avatar-perfil:active { transform: scale(0.97); }
+.avatar-perfil img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.avatar-iniciales {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 100%;
+  font-weight: 700; font-size: 17px; color: var(--text);
+  letter-spacing: .02em;
+}
+/* El lapiz solo aparece al pasar por encima: siempre visible ensucia el
+   avatar, y en tactil el propio circulo ya invita a tocarlo. */
+.avatar-lapiz {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(29, 24, 46, 0.55);
+  color: #fff; opacity: 0;
+  transition: opacity .2s ease;
+}
+.avatar-perfil:hover .avatar-lapiz,
+.avatar-perfil:focus-visible .avatar-lapiz { opacity: 1; }
+
+.foto-estado {
+  min-height: 16px; margin: 8px 0 0;
+  font-size: 12px; color: var(--text-soft);
+}
+.foto-estado.es-error { color: #D65A7A; }
+
+/* ---------- Contraste sobre el vidrio delgado ----------
+   El cristal translucido deja pasar el fondo, asi que el color efectivo
+   bajo el texto ya no es el de la tarjeta. Estas reglas devuelven el
+   contraste sin volver a espesar el vidrio, que es lo que se queria. */
+
+/* En oscuro, el rojo del enlace de crisis quedaba en 1.8:1 sobre el
+   cristal morado. Se aclara para ese tema en vez de oscurecerse. */
+[data-theme="dark"] .auth-sos-link {
+  color: #FFC2D0;
+  background: rgba(214, 90, 122, 0.20);
+  border-color: rgba(255, 194, 208, 0.45);
+}
+
+/* El separador "o con tu correo" es texto chico sobre el punto mas claro
+   del destello: necesita su propio tono. */
+.auth-divider span, .divider-text { color: var(--text-soft); }
+
+/* Sombra de texto muy leve: sube la legibilidad sobre un fondo que se
+   mueve (la aurora) sin que se note como sombra. */
+.auth-card p, .auth-card .legal, .glass .legal {
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.55);
+}
+[data-theme="dark"] .auth-card p,
+[data-theme="dark"] .auth-card .legal,
+[data-theme="dark"] .glass .legal {
+  text-shadow: 0 1px 3px rgba(10, 8, 20, 0.65);
 }

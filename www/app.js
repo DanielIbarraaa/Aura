@@ -99,6 +99,7 @@
       computeClinicalData();
       pintarSesion();
       saveState();
+      pintarFoto();            // no se espera: la app ya es usable sin ella
     } catch (e) {
       console.warn("[Aura] no se pudo cargar el estado:", e.message);
       toast("Sin conexión: tus cambios se guardarán al volver la señal");
@@ -145,7 +146,7 @@
     if (estado) {
       estado.textContent = !u ? "Sin sesión"
         : u.proveedor === "local" ? "Sesión local, sin sincronizar"
-        : u.anonimo ? "Invitado · los datos viven en este teléfono"
+        : u.anonimo ? "Sesión antigua sin cuenta · crea una para no perder tus datos"
         : "Sesión con Google";
     }
   }
@@ -269,22 +270,6 @@
       } catch (err) {
         toast(errorAuth(err));
       }
-    });
-
-    $("#guestLoginForm")?.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const nombre = $("#loginGuestName")?.value.trim();
-      try {
-        const u = await window.AuraAuth.entrarComoInvitado(nombre);
-        state.patientId = u.uid || state.patientId;
-      } catch (err) {
-        console.warn("[Aura] invitado:", err);
-      }
-      state.isLoggedIn = true;
-      state.name = nombre || state.name || "Invitado";
-      saveState();
-      cerrarOverlay();
-      toast("Bienvenido/a a Aura");
     });
 
     $("#btnLogout")?.addEventListener("click", async () => {
@@ -530,6 +515,56 @@
     renderHome(); renderDiary(); renderAurorIA(); renderSettings();
     computeClinicalData();
     toast("Consentimiento registrado");
+  }
+
+  /* ---------- Foto de perfil ----------
+     Se pinta despues de que la app ya esta en pantalla. Es decoracion:
+     no vale la pena retrasar el arranque por ella. */
+  let fotoActual = null;
+
+  function fotoEstado(msg, esError) {
+    const el = $("#fotoEstado");
+    if (!el) return;
+    el.textContent = msg || "";
+    el.classList.toggle("es-error", !!esError);
+  }
+
+  function dibujarAvatar(dataUri) {
+    const img = $("#avatarImg"), ini = $("#avatarIniciales"), quitar = $("#btnQuitarFoto");
+    if (!img || !ini) return;
+    if (dataUri) {
+      img.src = dataUri; img.hidden = false;
+      ini.textContent = ""; ini.hidden = true;
+      if (quitar) quitar.hidden = false;
+    } else {
+      img.removeAttribute("src"); img.hidden = true;
+      ini.textContent = window.AuraFoto?.iniciales(state.name) || "";
+      ini.hidden = false;
+      if (quitar) quitar.hidden = true;
+    }
+  }
+
+  async function pintarFoto() {
+    dibujarAvatar(fotoActual);
+    if (!state.patientId || !window.AuraFoto) return;
+    const uri = await window.AuraFoto.cargar(state.patientId);
+    if (uri) { fotoActual = uri; dibujarAvatar(uri); }
+  }
+
+  async function elegirFoto(archivo) {
+    if (!archivo || !window.AuraFoto || !state.patientId) return;
+    fotoEstado("Preparando la imagen…");
+    try {
+      const uri = await window.AuraFoto.procesar(archivo);
+      await window.AuraFoto.guardar(state.patientId, uri);
+      fotoActual = uri;
+      dibujarAvatar(uri);
+      const kb = Math.round(uri.length / 1024);
+      fotoEstado(`Listo. Se guardó a ${window.AuraFoto.LADO}px (${kb} KB).`);
+      setTimeout(() => fotoEstado(""), 4000);
+    } catch (e) {
+      fotoEstado(e.message || "No se pudo usar esa imagen.", true);
+    }
   }
 
   /* ---------- Cifrado ----------
@@ -1207,6 +1242,7 @@
 
   function renderSettings() {
     pintarConsentimiento();
+    if (!fotoActual) dibujarAvatar(null);   // las iniciales siguen al nombre
     const nameInput = $("#settingsName");
     const emailInput = $("#settingsEmail");
     const phoneInput = $("#settingsPhone");
@@ -1403,6 +1439,21 @@
     // despues de que corre este bloque, asi que un listener directo no las veria.
     document.addEventListener("click", (e) => {
       if (e.target.closest("[data-activar-sensibles]")) activarSensibles();
+    });
+
+    $("#avatarPerfil")?.addEventListener("click", () => $("#inputFoto")?.click());
+    $("#inputFoto")?.addEventListener("change", (e) => {
+      const f = e.target.files && e.target.files[0];
+      e.target.value = "";          // permite volver a elegir el mismo archivo
+      elegirFoto(f);
+    });
+    $("#btnQuitarFoto")?.addEventListener("click", async () => {
+      if (!state.patientId || !window.AuraFoto) return;
+      await window.AuraFoto.borrar(state.patientId);
+      fotoActual = null;
+      dibujarAvatar(null);
+      fotoEstado("Foto quitada.");
+      setTimeout(() => fotoEstado(""), 3000);
     });
 
     $("#consentToggleBtn")?.addEventListener("click", async () => {
