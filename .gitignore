@@ -32,3 +32,8 @@ _to_delete/
 
 # Cache del CLI de Firebase
 .firebase/
+
+.DS_Store
+_respaldo/
+Claude outputs/
+*.command

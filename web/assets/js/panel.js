@@ -1,6 +1,7 @@
 import { auth, db, A, F, requireAuth } from "./firebase.js";
 import { dibujarAnimo, tablaAnimo } from "./grafica.js";
 import * as Notas from "./notas.js";
+import * as Avisos from "./avisos.js";
 
 const $ = (s) => document.querySelector(s);
 let uid = null, pacienteActivo = null, metricas = null, dias = 14, verTabla = false;
@@ -410,3 +411,116 @@ $("#btnExportar")?.addEventListener("click", async () => {
     btn.disabled = false; btn.textContent = "Exportar expediente";
   }
 });
+
+
+/* =========================================================
+   Avisos de SOS
+
+   La Cloud Function ya enviaba; lo que faltaba era que este panel
+   registrara un token para que hubiera a donde enviar. Ademas escucha
+   la coleccion alerts como respaldo: un push que no llega no deja
+   rastro, una alerta sin leer si.
+   ========================================================= */
+
+let offAlertas = null;
+let alertasPendientes = [];
+
+function avisosEstado(msg, esError) {
+  const el = $("#avisosEstado");
+  if (!el) return;
+  el.textContent = msg || "";
+  el.classList.toggle("es-error", !!esError);
+}
+
+async function pintarBotonAvisos() {
+  const btn = $("#btnAvisos");
+  if (!btn) return;
+
+  if (!Avisos.soportado()) {
+    btn.hidden = true;
+    avisosEstado("Este navegador no puede mostrar avisos de escritorio.");
+    return;
+  }
+  if (!Avisos.configurado()) {
+    btn.disabled = true;
+    btn.textContent = "Avisos no disponibles";
+    avisosEstado("Falta configurar la clave de notificaciones del proyecto (VAPID).", true);
+    return;
+  }
+
+  const activo = await Avisos.activoAqui(miPerfil);
+  btn.disabled = false;
+  btn.textContent = activo ? "Desactivar avisos" : "Activar avisos";
+  btn.dataset.activo = activo ? "1" : "";
+
+  if (activo) {
+    avisosEstado("Este aparato recibirá un aviso cuando un paciente active el SOS.");
+    Avisos.escucharPrimerPlano(() => { /* la lista de abajo ya se actualiza sola */ });
+  } else if (Avisos.permiso() === "denied") {
+    avisosEstado("Los avisos están bloqueados en este navegador. Permítelos desde el candado de la barra de direcciones.", true);
+  } else {
+    avisosEstado("Sin avisos activos: las alertas solo aparecerán aquí, cuando abras el panel.");
+  }
+}
+
+$("#btnAvisos")?.addEventListener("click", async () => {
+  const btn = $("#btnAvisos");
+  const estaActivo = btn.dataset.activo === "1";
+  btn.disabled = true;
+  btn.textContent = estaActivo ? "Desactivando…" : "Activando…";
+  try {
+    if (estaActivo) {
+      await Avisos.desactivar(uid);
+      avisosEstado("Avisos desactivados en este aparato.");
+    } else {
+      const r = await Avisos.activar(uid);
+      if (!r.ok) {
+        avisosEstado(Avisos.MOTIVOS[r.motivo] || "No se pudieron activar los avisos.", true);
+        if (r.detalle) console.warn("[panel] avisos:", r.detalle);
+      }
+    }
+    // Se relee el perfil: activar/desactivar cambia fcmTokens.
+    const snap = await F.getDoc(F.doc(db, "therapists", uid));
+    if (snap.exists()) miPerfil = snap.data();
+  } finally {
+    await pintarBotonAvisos();
+  }
+});
+
+/* ---------- alertas sin leer ---------- */
+
+function pintarAlertas(lista) {
+  alertasPendientes = lista;
+  const caja = $("#alertasSinLeer");
+  if (!caja) return;
+
+  if (!lista.length) { caja.hidden = true; caja.innerHTML = ""; return; }
+
+  const filas = lista.slice(0, 8).map(a => {
+    const cuando = a.at ? fmtHora(a.at) : "hace un momento";
+    const quien = a.patientId ? `Paciente ${a.patientId.slice(0, 4).toUpperCase()}` : "Un paciente";
+    return `<li><strong>${escapar(quien)}</strong> activó el SOS · ${escapar(cuando)}</li>`;
+  }).join("");
+
+  caja.hidden = false;
+  caja.innerHTML = `
+    <div class="alertas-cabeza">
+      <strong>${lista.length} alerta${lista.length > 1 ? "s" : ""} de SOS sin revisar</strong>
+      <button class="btn btn-linea btn-sm" id="btnMarcarTodas" type="button">Marcar revisadas</button>
+    </div>
+    <ul>${filas}</ul>
+    ${lista.length > 8 ? `<p class="alertas-mas">y ${lista.length - 8} más</p>` : ""}
+    <p class="alertas-nota">Aura no atiende urgencias. Si hay riesgo, actúa por tus canales clínicos.</p>`;
+
+  $("#btnMarcarTodas")?.addEventListener("click", async (e) => {
+    e.target.disabled = true; e.target.textContent = "Marcando…";
+    await Avisos.marcarTodas(alertasPendientes);
+  });
+}
+
+/* Arranque: ambas cosas se montan cuando ya hay perfil cargado. */
+if (uid) {
+  pintarBotonAvisos();
+  offAlertas?.();
+  offAlertas = Avisos.escucharAlertas(uid, pintarAlertas);
+}

@@ -20,6 +20,31 @@
             </intent-filter>
         </activity>
 
+        <!-- ================= Widgets de Aura =================
+             exported="false": nadie fuera de la app puede dispararlos.
+             El lanzador sí los puede usar porque el sistema tiene
+             permiso propio para los AppWidgetProvider declarados. -->
+        <receiver android:name=".AuraWidgetCielo" android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_cielo_info" />
+        </receiver>
+
+        <receiver android:name=".AuraWidgetAnimo" android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_animo_info" />
+        </receiver>
+
+        <!-- Icono y color por omisión de las notificaciones locales.
+             Sin el icono monocromo, Android pinta un cuadro blanco. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_aura"
+        />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -32,4 +57,9 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Android 13 en adelante exige pedirlo en tiempo de ejecución.
+         Declararlo aquí solo lo hace posible; el permiso se pide cuando
+         la persona enciende el recordatorio, no al abrir la app. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>

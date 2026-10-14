@@ -82,8 +82,16 @@
         <div class="terminos" id="terminos"></div>
       </div>
 
+      <!-- Red de respaldo: si el push no llego, la alerta sigue aqui hasta
+           que alguien la marque. No se desvanece sola. -->
+      <div id="alertasSinLeer" class="alertas-sin-leer" hidden></div>
+
       <div class="bloque-panel">
-        <h3>Historial de activaciones del SOS</h3>
+        <div class="notas-head">
+          <h3>Historial de activaciones del SOS</h3>
+          <button class="btn btn-linea btn-sm" id="btnAvisos" type="button">Activar avisos</button>
+        </div>
+        <p class="avisos-estado" id="avisosEstado"></p>
         <div class="linea-tiempo" id="sosLista"></div>
       </div>
 

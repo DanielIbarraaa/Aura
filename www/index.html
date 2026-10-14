@@ -41,6 +41,11 @@
   <symbol id="i-backspace" viewBox="0 0 24 24"><path d="M9 5h11a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H9l-6-7 6-7Z"/><line x1="13" y1="10" x2="18" y2="15"/><line x1="18" y1="10" x2="13" y2="15"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></symbol>
   <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 11l16-7-6.5 16-3-6.5L4 11Z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12.5 9 17.5 20 6.5"/></symbol>
+  <symbol id="i-volume" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></symbol>
+  <symbol id="i-volume-off" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><line x1="16" y1="9" x2="21" y2="14"/><line x1="21" y1="9" x2="16" y2="14"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></symbol>
+  <symbol id="i-mic-off" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4" y1="3" x2="20" y2="21"/></symbol>
   <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
   <symbol id="i-user" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
   <symbol id="i-alert-triangle" viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3Z"/><line x1="12" y1="9" x2="12" y2="14"/><line x1="12" y1="17" x2="12" y2="17.01"/></symbol>
@@ -78,7 +83,11 @@
     </div>
 
     <form id="emailLoginForm" style="display:flex; flex-direction:column; gap:10px;">
-      <input type="text" id="loginNombre" class="input-field hidden" placeholder="Tu nombre o apodo" maxlength="30" autocomplete="name" style="margin-top:0;">
+      <input type="text" id="loginNombre" class="input-field hidden" placeholder="Tu nombre" maxlength="80" autocomplete="name" style="margin-top:0;">
+      <label class="campo-fecha hidden" id="loginNacimientoCampo">
+        <span>Fecha de nacimiento</span>
+        <input type="date" id="loginNacimiento" class="input-field" autocomplete="bday" style="margin-top:0;">
+      </label>
       <input type="email" id="loginEmail" class="input-field" placeholder="Correo electrónico" autocomplete="email" required style="margin-top:0;">
       <input type="password" id="loginPass" class="input-field" placeholder="Contraseña" autocomplete="current-password" minlength="6" required style="margin-top:0;">
       <button type="submit" class="glass-btn primary block" id="emailSubmitBtn" style="font-weight:700;">Entrar</button>
@@ -145,6 +154,29 @@
     </div>
 
     <!-- Mini Análisis Clínico para el Especialista -->
+    <div class="card glass" id="cieloCard">
+      <div class="cielo-cabeza">
+        <div class="cielo-titulo">
+          <h3 id="cieloNombre">Tu cielo</h3>
+          <p class="cielo-nota" id="cieloNota"></p>
+        </div>
+        <div class="cielo-total">
+          <strong id="cieloDias">0</strong>
+          <span id="cieloDiasTxt">días</span>
+        </div>
+      </div>
+
+      <div class="cielo-cuerpo">
+        <div class="cielo-mapa" id="cieloMapa"></div>
+        <div class="cielo-info">
+          <p class="cielo-progreso" id="cieloProgreso"></p>
+          <ul class="cielo-lista" id="cieloLista"></ul>
+        </div>
+      </div>
+
+      <div class="cielo-ganadas" id="cieloGanadas" hidden></div>
+    </div>
+
     <div id="inicioSinConsent" class="hidden"></div>
 
     <div class="card glass" id="clinicalCardContainer">
@@ -185,10 +217,12 @@
 
     <!-- Gráfica de ánimo sin espacios en blanco -->
     <div class="card glass" id="chartCardContainer">
-      <h4 style="font-size:15px; margin-bottom:12px;">Monitoreo Continuo del Estado de Ánimo</h4>
+      <h4 style="font-size:15px; margin-bottom:4px;">Monitoreo Continuo del Estado de Ánimo</h4>
+      <p class="chart-sub">Últimos 30 días. Pasa el cursor por un punto para ver el día y el valor.</p>
       <div class="chart-container">
-        <svg class="chart-svg" id="moodChart" style="width:100%; height:120px;"></svg>
+        <svg class="chart-svg" id="moodChart"></svg>
       </div>
+      <div class="chart-resumen" id="chartResumen"></div>
     </div>
   </section>
 
@@ -208,9 +242,9 @@
 
     <div class="mood-card glass card">
       <div class="mood-face">
-        <svg class="icon-lg"><use href="#i-bar-chart"/></svg>
+        <svg class="icon-lg" id="moodFaceIcon"><use href="#i-bar-chart"/></svg>
       </div>
-      <div style="font-weight:700; font-size:16px; margin-bottom:2px;" id="moodLabel">Neutral</div>
+      <div class="mood-label" id="moodLabel">Neutral</div>
       <p style="font-size:13px; color:var(--text-soft); margin-bottom:16px;">¿Cómo te sientes el día de hoy?</p>
       <div class="mood-slider">
         <input type="range" id="moodRange" min="1" max="5" step="1" value="3">
@@ -286,7 +320,7 @@
   <section class="screen" id="screen-auroria">
     <div class="section-head fila-accion">
       <div class="fila-info">
-        <img class="auroria-avatar" src="assets/aurorIA-avatar.png" alt="" width="52" height="52">
+        <img class="auroria-avatar" src="assets/aurorIA-avatar.webp" alt="" width="52" height="52">
         <div>
           <h2>aurorIA</h2>
           <p>Acompañamiento empático con memoria contextual.</p>
@@ -301,10 +335,28 @@
       Consulta el portal del <button type="button" class="enlace-inline" data-external="https://www.inprf.gob.mx">Instituto Nacional de Psiquiatría</button>.</span>
     </div>
 
+    <div class="mascota-caja">
+      <div id="mascotaAurorIA"></div>
+      <p class="mascota-pie" id="mascotaPie"></p>
+      <div class="voz-controles" id="vozControles">
+        <button type="button" class="voz-chip" id="chipLeer" aria-pressed="false">
+          <svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume-off"/></svg>
+          <span>Que me lea</span>
+        </button>
+        <button type="button" class="voz-chip" id="chipConversar" aria-pressed="false">
+          <svg class="icon icon-sm" aria-hidden="true"><use href="#i-mic"/></svg>
+          <span>Conversar por voz</span>
+        </button>
+      </div>
+    </div>
+
     <div class="card glass" style="padding:0; overflow:hidden;">
       <div class="chat-log" id="chatLog"></div>
       <form class="chat-input" id="chatForm">
         <input type="text" id="chatInput" placeholder="Habla con aurorIA sobre lo que sientes..." autocomplete="off">
+        <button type="button" class="chat-mic" id="chatMicBtn" aria-label="Dictar un mensaje">
+          <svg class="icon icon-sm" aria-hidden="true"><use href="#i-mic"/></svg>
+        </button>
         <button type="submit" class="chat-send"><svg class="icon icon-sm"><use href="#i-send"/></svg></button>
       </form>
     </div>
@@ -527,7 +579,7 @@
         </div>
         <div>
           <label style="font-size:12px; color:var(--text-soft);">Fecha de nacimiento</label>
-          <input type="date" id="settingsBirth" class="input-field">
+          <input type="date" id="settingsBirth" class="input-field" autocomplete="bday">
         </div>
         <button class="glass-btn primary sm" id="saveProfileBtn" style="align-self:flex-start; margin-top:6px;">Guardar perfil</button>
       </div>
@@ -540,6 +592,34 @@
           <p style="font-size:12px; color:var(--text-soft); max-width:38ch;">Activa respuestas generadas por IA. Lo que escribas en el chat se envía a Google para generar la respuesta. Tu diario nunca se envía. Apagado, aurorIA responde con guiones locales y funciona sin señal.</p>
         </div>
         <div class="switch" id="aiConsentSwitch"></div>
+      </div>
+      <div class="settings-row" id="filaVoz">
+        <div>
+          <strong>Que aurorIA hable en voz alta</strong>
+          <p style="font-size:12px; color:var(--text-soft); max-width:38ch;">Lee sus respuestas usando la voz que ya trae tu teléfono. No se envía nada a ningún servidor y funciona sin señal. Viene apagado: enciéndelo solo si estás en un lugar donde puedas escuchar.</p>
+          <p style="font-size:11.5px; color:var(--text-mute); margin-top:4px;" id="vozEstado"></p>
+        </div>
+        <div class="switch" id="vozSwitch"></div>
+      </div>
+      <div class="settings-row" id="filaMicrofono">
+        <div>
+          <strong>Conversar por voz</strong>
+          <p style="font-size:12px; color:var(--text-soft); max-width:38ch;">Te deja hablarle a aurorIA en vez de escribir. <b>El audio de tu micrófono se envía al servicio de reconocimiento de tu navegador para convertirlo en texto</b> — a diferencia de tu diario, esto no se procesa en el teléfono. Se activa cuando tú lo enciendes y se apaga al salir de la pantalla.</p>
+          <p style="font-size:11.5px; color:var(--text-mute); margin-top:4px;" id="microfonoEstado"></p>
+        </div>
+        <div class="switch" id="microfonoSwitch"></div>
+      </div>
+      <div class="settings-row hidden" id="filaRecordatorio">
+        <div>
+          <strong>Recordatorio diario</strong>
+          <p style="font-size:12px; color:var(--text-soft); max-width:38ch;">Un aviso a la hora que tú elijas. Lo programa tu teléfono, no un servidor: funciona sin señal y nadie más sabe a qué hora lo pusiste. En la pantalla bloqueada no se lee el texto.</p>
+          <label class="campo-fecha" style="margin-top:8px; max-width:150px;">
+            <span>Hora</span>
+            <input type="time" id="recordatorioHora" class="input-field" value="21:00" style="margin-top:0;">
+          </label>
+          <p style="font-size:11.5px; color:var(--text-mute); margin-top:6px;" id="recordatorioEstado"></p>
+        </div>
+        <div class="switch" id="recordatorioSwitch"></div>
       </div>
     </div>
 
@@ -614,12 +694,12 @@
 
 <!-- BOTTOM TABBAR (MÓVIL) CON BOTÓN SOS INTEGRADO -->
 <nav class="tabbar glass">
-  <button data-screen="inicio" class="active"><svg class="icon"><use href="#i-home"/></svg>Inicio</button>
-  <button data-screen="diario"><svg class="icon"><use href="#i-book"/></svg>Diario</button>
-  <button data-screen="auroria"><svg class="icon"><use href="#i-bot"/></svg>aurorIA</button>
-  <button data-screen="calma"><svg class="icon"><use href="#i-calm"/></svg>Calma</button>
-  <button data-screen="especialistas"><svg class="icon"><use href="#i-users"/></svg>Especialistas</button>
-  <button id="tabbarSosBtn" class="tabbar-sos-btn" aria-label="Botón de emergencia SOS"><svg class="icon"><use href="#i-alert-triangle"/></svg>SOS</button>
+  <button data-screen="inicio" class="active"><svg class="icon"><use href="#i-home"/></svg><span class="tab-txt">Inicio</span></button>
+  <button data-screen="diario"><svg class="icon"><use href="#i-book"/></svg><span class="tab-txt">Diario</span></button>
+  <button data-screen="auroria"><svg class="icon"><use href="#i-bot"/></svg><span class="tab-txt">aurorIA</span></button>
+  <button data-screen="calma"><svg class="icon"><use href="#i-calm"/></svg><span class="tab-txt">Calma</span></button>
+  <button data-screen="especialistas" aria-label="Especialistas"><svg class="icon"><use href="#i-users"/></svg><span class="tab-txt">Expertos</span></button>
+  <button id="tabbarSosBtn" class="tabbar-sos-btn" aria-label="Botón de emergencia SOS"><svg class="icon"><use href="#i-alert-triangle"/></svg><span class="tab-txt">SOS</span></button>
 </nav>
 
 <!-- MODAL SOS DE ALTA INTENSIDAD (80% - 100% ANSIEDAD) -->
@@ -703,6 +783,53 @@
 <script src="js/aura-cripto.js"></script>
 <script src="js/aura-foto.js"></script>
 <script src="js/aura-consentimiento.js"></script>
+<script src="js/aura-perfil.js"></script>
+<script src="js/aura-timbre.js"></script>
+<script src="js/aura-escucha.js"></script>
+<script src="js/aura-voz.js"></script>
+<script src="js/aura-mascota.js"></script>
+<script>
+/* ---------- que ningún error muera en silencio ----------
+   Va aquí, en línea y antes que todo lo demás, porque un error que
+   ocurre mientras cargan los módulos no lo alcanza a ver ningún
+   manejador registrado después. Lo que atrapa se guarda y la app lo
+   muestra cuando ya hay interfaz. Sin esto, una promesa rechazada en
+   iOS se ve exactamente igual que una pantalla trabada. */
+(function () {
+  window.__auraFallos = [];
+  function apuntar(que, detalle) {
+    try {
+      window.__auraFallos.push({ que: que, detalle: String(detalle), cuando: Date.now() });
+      if (window.__auraMostrarFallo) window.__auraMostrarFallo(que, String(detalle));
+    } catch (e) {}
+  }
+  window.addEventListener("error", function (ev) {
+    apuntar("error", (ev && ev.message) || "desconocido");
+  });
+  /* Diagnóstico: qué plugins nativos ve de verdad el puente. Se imprime
+     en la consola de Xcode y se guarda para poder enseñarlo en pantalla.
+     Es la única forma de distinguir "no compiló" de "compiló pero no se
+     registró" sin adivinar. */
+  window.AuraPluginsDiag = function () {
+    try {
+      var P = (window.Capacitor && window.Capacitor.Plugins) ? Object.keys(window.Capacitor.Plugins) : null;
+      var msg = P === null ? "(no hay window.Capacitor)" : (P.length ? P.sort().join(", ") : "(lista vacía)");
+      console.log("[Aura diag] plataforma:", (window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform()) || "?");
+      console.log("[Aura diag] plugins nativos:", msg);
+      window.__auraPlugins = msg;
+    } catch (e) { console.log("[Aura diag] falló:", e.message); }
+  };
+  window.addEventListener("load", function () { setTimeout(window.AuraPluginsDiag, 900); });
+
+  window.addEventListener("unhandledrejection", function (ev) {
+    var r = ev && ev.reason;
+    apuntar("promesa", (r && (r.message || r.code)) || r || "desconocido");
+  });
+})();
+</script>
+<script src="js/aura-cielo.js"></script>
+<script src="js/aura-recordatorio.js"></script>
+<script src="js/aura-widget.js"></script>
 <script src="js/aura-estado.js"></script>
 <script src="js/aura-ai.js"></script>
 <script src="js/aura-sync.js"></script>

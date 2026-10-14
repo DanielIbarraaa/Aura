@@ -28,5 +28,24 @@
     "FirebaseAppCheck": {
       "debug": false
     }
+  },
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#EEF0FA",
+    "scrollEnabled": true,
+    "preferredContentMode": "mobile",
+    "limitsNavigationsToAppBoundDomains": false,
+    "includePlugins": [
+      "@capacitor-community/speech-recognition",
+      "@capacitor-firebase/app-check",
+      "@capacitor-firebase/authentication",
+      "@capacitor/app",
+      "@capacitor/browser",
+      "@capacitor/haptics",
+      "@capacitor/local-notifications",
+      "@capacitor/preferences",
+      "@capacitor/splash-screen",
+      "@capacitor/status-bar"
+    ]
   }
 }
