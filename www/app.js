@@ -6,7 +6,17 @@
 
   const $ = (sel, ctx = document) => ctx.querySelector(sel);
   const $all = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
-  const todayKey = (d = new Date()) => d.toISOString().slice(0, 10);
+  /* toISOString() convierte a UTC, y México va seis horas atrás. Con
+     eso, todo lo registrado después de las 18:00 hora local se guardaba
+     con la fecha del DÍA SIGUIENTE: la gráfica mostraba el ánimo de la
+     noche en la barra de mañana, y un registro a las 8 de la noche del
+     lunes y otro a las 9 de la mañana del martes contaban como el mismo
+     día. Se arma a mano con los componentes locales. */
+  const todayKey = (d = new Date()) => {
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dia = String(d.getDate()).padStart(2, "0");
+    return d.getFullYear() + "-" + m + "-" + dia;
+  };
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
   const STORAGE_KEY = "aura_state_v8";
@@ -38,6 +48,27 @@
     // Registro del consentimiento informado (art. 8 y 15 LFPDPPP).
     // { versionAviso, terminos, datosSensibles, aceptadoEn, actualizadoEn }
     consentimiento: null,
+    // Se calcula de birth al registrarse. Se guarda aparte porque la edad
+    // cambia sola: un menor deja de serlo sin que nadie toque la app, y
+    // recalcularlo en cada lectura evita tratarlo como menor de por vida.
+    menorDeEdad: false,
+    tutorAutoriza: null,    // fecha ISO de la constancia, solo si aplica
+    // Apagada a proposito. Esta app se abre en el camion, en la oficina
+    // y en la cama de madrugada; en los tres casos un telefono que
+    // empieza a hablar solo es un problema, no una funcion.
+    vozActiva: false,
+    avisoVozVisto: false,
+    // Conversar por voz: el micrófono manda audio a un servicio externo,
+    // así que va apagado y con su propio aviso la primera vez.
+    vozAVoz: false,
+    avisoMicVisto: false,
+    // Tu cielo: progreso que solo sube. Ver js/aura-cielo.js.
+    cielo: null,
+    // Recordatorio diario. Lo pone la persona; apagado de fábrica.
+    recordatorio: { activo: false, hora: 21, minuto: 0 },
+    // Qué se hizo HOY. Solo para palomear la lista; nada de esto
+    // condiciona la estrella, que la da el registro de ánimo.
+    actividad: { fecha: null, calma: false, chat: false },
     patientId: null
   });
 
@@ -89,6 +120,11 @@
       // consentido el tratamiento de sus datos de salud, no tiene por que
       // ver primero sus graficas y despues el formulario.
       await revisarConsentimiento();
+      await revisarPerfil();
+      await recogerAnimoDelWidget();
+      await escucharEnlaces();
+      aplicarAnimoPendiente();   // por si el enlace llegó antes de la sesión
+      window.AuraWidget?.publicarCielo(state);
 
       applyTheme(state.theme);
       renderHome();
@@ -105,6 +141,14 @@
       toast("Sin conexión: tus cambios se guardarán al volver la señal");
     }
   }
+
+  /* El puente con el vigilante de index.html. Desde aquí ya hay toast,
+     así que los fallos que se guardaron durante la carga —y los que
+     lleguen después— se pueden enseñar en vez de quedarse en la consola
+     de un teléfono que nadie está mirando. */
+  window.__auraMostrarFallo = function (que, detalle) {
+    try { toast((que === "promesa" ? "Algo falló: " : "Error: ") + detalle); } catch (e) {}
+  };
 
   function toast(msg) {
     const wrap = $("#toastWrap");
@@ -222,11 +266,24 @@
     // Correo y contraseña: mismo comportamiento en navegador y en el APK.
     let modoRegistro = false;
     const campoNombre = $("#loginNombre");
+    const campoFecha = $("#loginNacimientoCampo");
+    const inputFecha = $("#loginNacimiento");
     const btnEnviar = $("#emailSubmitBtn");
     const btnToggle = $("#toggleRegistro");
 
+    // Sin tope, el selector de fecha acepta el año 3025. Se pone aqui y no
+    // en el HTML porque depende de que dia es hoy.
+    const Perfil = () => window.AuraPerfil;
+    if (Perfil()) {
+      const tope = Perfil().hoyISO();
+      if (inputFecha) inputFecha.max = tope;
+      const sb = $("#settingsBirth");
+      if (sb) sb.max = tope;
+    }
+
     function pintarModo() {
       campoNombre?.classList.toggle("hidden", !modoRegistro);
+      campoFecha?.classList.toggle("hidden", !modoRegistro);
       if (btnEnviar) btnEnviar.textContent = modoRegistro ? "Crear cuenta" : "Entrar";
       if (btnToggle) btnToggle.textContent = modoRegistro ? "Ya tengo cuenta" : "Crear una cuenta";
       const pass = $("#loginPass");
@@ -240,16 +297,30 @@
       const email = $("#loginEmail")?.value.trim();
       const pass = $("#loginPass")?.value;
       const nombre = campoNombre?.value.trim();
+      const nacimiento = inputFecha?.value || "";
       if (!email || !pass) return;
+
+      // Al registrarse los dos datos son obligatorios. Se revisan ANTES de
+      // crear la cuenta: si se validaran despues, un nombre en blanco
+      // dejaria una cuenta ya creada a medio llenar.
+      if (modoRegistro && Perfil()) {
+        const motivo = Perfil().validar(nombre, nacimiento);
+        if (motivo) { toast(motivo); return; }
+      }
+
       const antes = btnEnviar ? btnEnviar.textContent : "";
       if (btnEnviar) { btnEnviar.disabled = true; btnEnviar.textContent = "Un momento…"; }
       try {
         const u = modoRegistro
-          ? await window.AuraAuth.registrarConCorreo(nombre, email, pass)
+          ? await window.AuraAuth.registrarConCorreo(nombre, email, pass, { nacimiento })
           : await window.AuraAuth.entrarConCorreo(email, pass);
         state.isLoggedIn = true;
         state.patientId = u.uid || state.patientId;
         if (u.nombre) state.name = u.nombre;
+        if (modoRegistro && nacimiento) {
+          state.birth = nacimiento;
+          state.menorDeEdad = Perfil() ? Perfil().esMenor(nacimiento) : false;
+        }
         saveState();
         cerrarOverlay();
         await hidratar(u);
@@ -290,6 +361,14 @@
   const SCREENS = ["inicio", "diario", "auroria", "calma", "especialistas", "ajustes"];
   function showScreen(name) {
     if (!SCREENS.includes(name)) name = "inicio";
+    // Cambiar de pantalla calla a aurorIA. Sin esto sigue hablando sola
+    // desde una pantalla que ya nadie esta viendo.
+    if (name !== "auroria") {
+      callarMascota();
+      // El micrófono no se queda abierto en una pantalla que nadie ve.
+      window.AuraEscucha?.cancelar();
+      if (typeof pintarEscucha === "function") pintarEscucha(false);
+    }
     SCREENS.forEach(s => {
       const el = $(`#screen-${s}`);
       if (el) el.classList.toggle("active", s === name);
@@ -305,6 +384,217 @@
     if (name === "especialistas") window.AuraDirectorio?.render();
     if (name === "ajustes") renderSettings();
     location.hash = "#/" + name;
+  }
+
+  /* =========================================================
+     Tu cielo
+     ========================================================= */
+
+  const Cielo = () => window.AuraCielo;
+
+  /** Pone en cero la actividad del día cuando cambia la fecha. */
+  function actividadDeHoy() {
+    const hoy = todayKey();
+    if (!state.actividad || state.actividad.fecha !== hoy) {
+      state.actividad = { fecha: hoy, calma: false, chat: false };
+    }
+    return state.actividad;
+  }
+
+  /** Marca que hoy se usó Calma o se habló con aurorIA. */
+  function marcarActividad(cual) {
+    const a = actividadDeHoy();
+    if (a[cual]) return;            // ya estaba: no se vuelve a guardar
+    a[cual] = true;
+    saveState();
+    if ($("#screen-inicio")?.classList.contains("active")) renderCielo();
+  }
+
+  /**
+   * Enciende la estrella del día. Se llama SOLO al registrar el ánimo.
+   * Entrar dos veces el mismo día no suma dos veces y tampoco es error.
+   */
+  function encenderEstrella() {
+    const C = Cielo();
+    if (!C || !puedeTratarSensibles()) return;
+
+    const r = C.marcarDia(state, todayKey());
+    if (!r.nuevaEstrella) return;
+
+    state.cielo = r.cielo;
+    saveState();
+    renderCielo(true);
+    window.AuraWidget?.publicarCielo(state);
+
+    if (r.completada) {
+      // El único momento en que esto celebra algo. No hay mensajes por
+      // faltar, así que este tiene espacio para significar.
+      toast("Completaste " + r.completada.nombre);
+      // Celebración, no empujón: sale porque la persona acaba de
+      // terminar algo, nunca porque haya dejado de entrar.
+      window.AuraRecordatorio?.celebrar(r.completada.nombre, r.completada.i);
+    }
+  }
+
+  /* ---------- lo que se registró desde el widget ----------
+     El widget no tiene sesión de Firebase ni forma de escribir en
+     Firestore: apunta el ánimo en disco y la app lo recoge aquí, al
+     arrancar. Por eso un registro hecho desde la pantalla de inicio
+     aparece en la gráfica hasta el siguiente arranque. */
+  /* ---------- lo que llega desde el widget de iOS ----------
+     En Android el widget escribe el ánimo en disco y la app lo recoge al
+     arrancar. En iOS no hay disco compartido —eso necesita un App Group,
+     que Apple no da a cuentas personales— así que el widget hace lo
+     único que sí puede: abrir la app con el ánimo en la URL.
+
+     El enlace puede llegar en dos momentos muy distintos:
+       - con la app ya abierta, por el evento appUrlOpen
+       - con la app cerrada, y entonces la URL es la de arranque
+     Y puede llegar antes de que haya sesión o consentimiento. Por eso se
+     guarda como pendiente y se aplica cuando de verdad se puede; si no,
+     el toque se perdería en silencio, que es la peor forma de fallar. */
+  let animoPendiente = null;
+
+  function atenderEnlace(url) {
+    if (!url) return;
+    const m = String(url).match(/^aura:\/\/animo(?:\?valor=([1-5]))?/i);
+    if (!m) return;
+    showScreen("diario");
+    if (m[1]) { animoPendiente = Number(m[1]); aplicarAnimoPendiente(); }
+  }
+
+  function aplicarAnimoPendiente() {
+    if (animoPendiente == null) return;
+    if (!state.isLoggedIn || !puedeTratarSensibles()) return;   // se queda esperando
+
+    const v = animoPendiente;
+    animoPendiente = null;
+
+    const hoy = todayKey();
+    const idx = state.moodLogs.findIndex(m => m.date === hoy);
+    if (idx >= 0) state.moodLogs[idx].value = v; else state.moodLogs.push({ date: hoy, value: v });
+    saveState();
+
+    const s = $("#moodRange");
+    if (s) s.value = v;
+    pintarAnimo(v);
+    drawChart();
+    computeClinicalData();
+    encenderEstrella();
+    toast(`Registrado: ${ANIMOS[v].texto}`);
+  }
+
+  /** Engancha el widget de iOS. El plugin App ya está en el proyecto. */
+  async function escucharEnlaces() {
+    const A = window.Capacitor?.Plugins?.App;
+    if (!A) return;
+    try {
+      A.addListener("appUrlOpen", (ev) => atenderEnlace(ev && ev.url));
+      // La app venía cerrada: la URL que la despertó llega por aquí.
+      const inicio = await A.getLaunchUrl();
+      if (inicio && inicio.url) atenderEnlace(inicio.url);
+    } catch (e) { console.warn("[Aura enlace]", e.message); }
+  }
+
+  async function recogerAnimoDelWidget() {
+    const W = window.AuraWidget;
+    if (!W || !W.disponible() || !puedeTratarSensibles()) return;
+
+    const m = await W.recogerAnimo();
+    if (!m) return;
+
+    // Si ese día ya tenía registro en la app, gana el de la app: se
+    // hizo con más contexto que un toque en la pantalla de inicio.
+    const idx = state.moodLogs.findIndex(x => x.date === m.fecha);
+    if (idx >= 0) return;
+
+    state.moodLogs.push({ date: m.fecha, value: m.valor });
+    saveState();
+    if (m.fecha === todayKey()) encenderEstrella();
+    drawChart();
+    computeClinicalData();
+    pintarAnimo(m.valor);
+    toast("Se registró lo que marcaste en la pantalla de inicio");
+  }
+
+  const TAREAS = [
+    { id: "animo",  clave: true,  texto: "Registrar cómo te sientes" },
+    { id: "diario", clave: false, texto: "Escribir en tu diario" },
+    { id: "calma",  clave: false, texto: "Un ejercicio de Calma" },
+    { id: "chat",   clave: false, texto: "Platicar con aurorIA" }
+  ];
+
+  function hechoHoy() {
+    const hoy = todayKey();
+    const a = actividadDeHoy();
+    return {
+      animo:  state.moodLogs.some(m => m.date === hoy),
+      diario: state.diaryEntries.some(e => e.date === hoy),
+      calma:  !!a.calma,
+      chat:   !!a.chat
+    };
+  }
+
+  function renderCielo(recienEncendida) {
+    const C = Cielo();
+    const tarjeta = $("#cieloCard");
+    if (!C || !tarjeta) return;
+
+    // Es progreso sobre datos de salud: sin consentimiento no se muestra.
+    if (!puedeTratarSensibles()) { tarjeta.classList.add("hidden"); return; }
+    tarjeta.classList.remove("hidden");
+
+    const cielo = C.leer(state);
+    const cons = C.actual(cielo);
+    const total = cons.estrellas.length;
+    const hecho = hechoHoy();
+
+    $("#cieloNombre").textContent = cons.nombre + (cons.alias ? " · " + cons.alias : "");
+    $("#cieloNota").textContent = cons.nota;
+    $("#cieloDias").textContent = cielo.total;
+    $("#cieloDiasTxt").textContent = cielo.total === 1 ? "día" : "días";
+
+    const mapa = $("#cieloMapa");
+    if (mapa) {
+      mapa.innerHTML = C.svg(cons, cielo.estrellas);
+      if (recienEncendida && cielo.estrellas > 0) {
+        mapa.querySelector('.cielo-astro[data-i="' + (cielo.estrellas - 1) + '"]')
+            ?.classList.add("nueva");
+      }
+    }
+
+    /* El texto NUNCA menciona lo que falta como carencia. "Van 3 de 7"
+       describe; "te faltan 4" reclama. */
+    const p = $("#cieloProgreso");
+    if (p) {
+      const ult = C.ultimos(state, 7, todayKey());
+      p.innerHTML = cielo.estrellas === 0
+        ? "Empieza una constelación nueva. <b>" + total + " días</b> la completan."
+        : "Van <b>" + cielo.estrellas + " de " + total + "</b> estrellas · " +
+          ult.cuenta + " de los últimos 7 días";
+    }
+
+    const lista = $("#cieloLista");
+    if (lista) {
+      lista.innerHTML = TAREAS.map(t =>
+        '<li class="' + (hecho[t.id] ? "hecho" : "") + (t.clave ? " clave" : "") + '">' +
+        '<span class="cielo-marca"><svg class="icon"><use href="#i-check"/></svg></span>' +
+        '<span>' + t.texto + (t.clave && !hecho[t.id] ? " — enciende tu estrella" : "") + '</span>' +
+        '</li>').join("");
+    }
+
+    const ganadas = $("#cieloGanadas");
+    if (ganadas) {
+      const hechas = cielo.completadas.slice(-6).reverse();
+      ganadas.hidden = hechas.length === 0;
+      if (hechas.length) {
+        const mas = cielo.completadas.length - hechas.length;
+        ganadas.innerHTML = hechas.map(c => {
+          const k = C.CONSTELACIONES[c.i];
+          return '<span class="cielo-ganada"><span class="pt">✦</span>' + (k ? k.nombre : "—") + '</span>';
+        }).join("") + (mas > 0 ? '<span class="cielo-ganadas-mas">y ' + mas + ' más</span>' : "");
+      }
+    }
   }
 
   /* Mini Análisis Clínico */
@@ -394,6 +684,8 @@
       if (!ok && !hueco.innerHTML) hueco.innerHTML = tarjetaSinConsentimiento("tu estado de ánimo");
     }
 
+    renderCielo();
+
     const hour = new Date().getHours();
     const salute = hour < 12 ? "Buenos días" : hour < 19 ? "Buenas tardes" : "Buenas noches";
     const greetingEl = $("#homeGreeting");
@@ -402,63 +694,207 @@
     computeClinicalData();
   }
 
+  /* Los cinco estados del deslizador. El icono cambia con el valor: sin
+     eso el circulo de arriba era el mismo dibujo siempre, y la unica
+     senal de que algo cambiaba era la posicion del pulgar. */
+  const ANIMOS = {
+    1: { texto: "Muy bajo",  icono: "i-alert-triangle", color: "#D65A7A" },
+    2: { texto: "Bajo",      icono: "i-moon",           color: "#B57BA6" },
+    3: { texto: "Neutral",   icono: "i-bar-chart",      color: "#867BB8" },
+    4: { texto: "Bien",      icono: "i-sun",            color: "#7BA8B8" },
+    5: { texto: "Muy bien",  icono: "i-sparkles",       color: "#5FA88F" }
+  };
+
+  function pintarAnimo(valor) {
+    const a = ANIMOS[valor] || ANIMOS[3];
+    const etiqueta = $("#moodLabel");
+    const cara = $("#moodFaceIcon");
+    if (etiqueta) { etiqueta.textContent = a.texto; etiqueta.style.color = a.color; }
+    if (cara) {
+      cara.querySelector("use")?.setAttribute("href", "#" + a.icono);
+      cara.style.color = a.color;
+    }
+    const cont = $(".mood-face");
+    if (cont) cont.style.borderColor = a.color;
+  }
+
+  /** Pone el deslizador en el valor de hoy, o en 3 si aun no hay. */
+  function sincronizarAnimo() {
+    const s = $("#moodRange");
+    if (!s) return;
+    const hoy = state.moodLogs.find(m => m.date === todayKey());
+    const v = hoy ? hoy.value : 3;
+    s.value = String(v);
+    pintarAnimo(v);
+  }
+
+  /* El lienzo depende del ancho, asi que al redimensionar hay que
+     rehacerlo. Con debounce: sin el, arrastrar el borde de la ventana
+     dispara cientos de redibujos. */
+  let temporizadorGrafica = null;
+  addEventListener("resize", () => {
+    clearTimeout(temporizadorGrafica);
+    temporizadorGrafica = setTimeout(() => drawChart(), 180);
+  });
+
   function drawChart() {
     const svg = $("#moodChart");
     if (!svg) return;
 
-    const w = 600, h = 120, pad = 14;
-    const last30 = [];
-    const now = new Date();
-    for (let i = 29; i >= 0; i--) {
-      const d = new Date(now);
+    /* Margenes distintos por lado: a la izquierda cabe la escala 1-5 y
+       abajo las fechas. Antes el padding era uniforme y no habia espacio
+       para ninguna de las dos, por eso la grafica era una linea suelta
+       sin nada que dijera cuando ni cuanto. */
+    /* El lienzo se elige segun el ancho REAL disponible. Con un viewBox
+       fijo y proporcion 720x210, en una tarjeta ancha la grafica se
+       quedaba corta de alto y sobraba aire a los lados; en el telefono
+       pasaba lo contrario. Medir el contenedor resuelve las dos. */
+    const anchoCaja = (svg.parentNode?.getBoundingClientRect().width) || 720;
+    const angosto = anchoCaja < 520;
+    // El viewBox marca la proporcion, y con height:auto esa proporcion
+    // decide el alto en pixeles. Con un viewBox de 720x210 fijo, una
+    // tarjeta de 1450px daba 424px de alto: una grafica de animo no
+    // necesita ser mas alta que un parrafo. Tres bandas mantienen la
+    // proporcion sensata en cada tamano.
+    const w = angosto ? 380 : (anchoCaja > 1100 ? 1280 : 720);
+    const h = angosto ? 200 : (anchoCaja > 1100 ? 250 : 210);
+    const mIzq = angosto ? 26 : 30, mDer = 14, mArr = 14, mAba = 30;
+    const anchoUtil = w - mIzq - mDer;
+    const altoUtil  = h - mArr - mAba;
+
+    const DIAS = 30;
+    const hoy = new Date();
+    const serie = [];
+    for (let i = DIAS - 1; i >= 0; i--) {
+      const d = new Date(hoy);
       d.setDate(d.getDate() - i);
       const key = todayKey(d);
       const found = state.moodLogs.find(m => m.date === key);
-      last30.push({ date: key, value: found ? found.value : null });
+      serie.push({ fecha: d, key, value: found ? found.value : null });
     }
 
-    const recordedPoints = last30.filter(d => d.value !== null);
-    
-    if (recordedPoints.length === 0) {
+    const conDato = serie.filter(d => d.value !== null);
+
+    if (!conDato.length) {
       svg.style.display = "none";
-      let emptyMsg = $("#chartEmptyMsg");
-      if (!emptyMsg) {
-        emptyMsg = document.createElement("div");
-        emptyMsg.id = "chartEmptyMsg";
-        emptyMsg.className = "chart-empty-state";
-        emptyMsg.innerHTML = `<svg class="icon icon-sm"><use href="#i-bar-chart"/></svg><span>Aún no hay registros de ánimo guardados</span>`;
-        svg.parentNode.appendChild(emptyMsg);
+      let vacio = $("#chartEmptyMsg");
+      if (!vacio) {
+        vacio = document.createElement("div");
+        vacio.id = "chartEmptyMsg";
+        vacio.className = "chart-empty-state";
+        vacio.innerHTML = `<svg class="icon icon-sm"><use href="#i-bar-chart"/></svg><span>Aún no hay registros de ánimo guardados</span>`;
+        svg.parentNode.appendChild(vacio);
       }
+      const res = $("#chartResumen");
+      if (res) res.textContent = "";
       return;
     }
-
     svg.style.display = "block";
-    const emptyMsg = $("#chartEmptyMsg");
-    if (emptyMsg) emptyMsg.remove();
+    $("#chartEmptyMsg")?.remove();
 
-    const stepX = (w - pad * 2) / Math.max(last30.length - 1, 1);
-    let path = "", dots = "";
+    const paso = anchoUtil / Math.max(DIAS - 1, 1);
+    const px = i => mIzq + i * paso;
+    const py = v => mArr + altoUtil - ((v - 1) / 4) * altoUtil;
 
-    last30.forEach((d, i) => {
+    /* ---------- escala vertical ---------- */
+    let rejilla = "";
+    for (let v = 1; v <= 5; v++) {
+      const y = py(v);
+      rejilla += `<line x1="${mIzq}" y1="${y.toFixed(1)}" x2="${w - mDer}" y2="${y.toFixed(1)}"
+                    stroke="currentColor" stroke-opacity="${v === 1 ? '.28' : '.12'}" stroke-width="1"/>`;
+      rejilla += `<text x="${mIzq - 8}" y="${(y + 3.5).toFixed(1)}" text-anchor="end"
+                    font-size="11.5" fill="currentColor" fill-opacity=".6">${v}</text>`;
+    }
+
+    /* ---------- fechas: cinco marcas, no treinta ---------- */
+    const MES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+    let ejeX = "";
+    const marcas = angosto ? 3 : (anchoCaja > 1100 ? 7 : 5);
+    const cada = Math.max(1, Math.floor((DIAS - 1) / (marcas - 1)));
+    // "hoy" siempre va al final; las marcas regulares que le caerian encima
+    // se omiten. Dos etiquetas superpuestas no se leen ni una ni otra.
+    const zonaHoy = (w - mDer) - (angosto ? 38 : 46);
+    for (let i = 0; i < DIAS; i += cada) {
+      const x = px(i);
+      if (x > zonaHoy) continue;
+      const d = serie[i].fecha;
+      // La primera va anclada al inicio, no centrada: centrada se salia
+      // hacia la izquierda y se encimaba con el "1" de la escala vertical.
+      const anclaje = i === 0 ? "start" : "middle";
+      ejeX += `<text x="${x.toFixed(1)}" y="${h - 10}" text-anchor="${anclaje}"
+                 font-size="11.5" fill="currentColor" fill-opacity=".6">${d.getDate()} ${MES[d.getMonth()]}</text>`;
+    }
+    ejeX += `<text x="${(w - mDer).toFixed(1)}" y="${h - 10}" text-anchor="end"
+               font-size="11.5" fill="currentColor" fill-opacity=".6">hoy</text>`;
+
+    /* ---------- la linea ----------
+       Se corta cuando pasan mas de dos dias sin registro. Unir un lunes
+       con el viernes siguiente dibuja una tendencia que nunca existio:
+       el hueco es informacion, no un estorbo que tapar. */
+    const tramos = [];
+    let actual = [];
+    let ultimoI = -99;
+    serie.forEach((d, i) => {
       if (d.value === null) return;
-      const x = pad + i * stepX;
-      const y = h - pad - ((d.value - 1) / 4) * (h - pad * 2);
-      path += (path ? " L" : "M") + x.toFixed(1) + " " + y.toFixed(1);
-      dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" fill="#867BB8" />`;
+      if (i - ultimoI > 2 && actual.length) { tramos.push(actual); actual = []; }
+      actual.push({ i, v: d.value, fecha: d.fecha });
+      ultimoI = i;
+    });
+    if (actual.length) tramos.push(actual);
+
+    let lineas = "", area = "", puntos = "";
+    tramos.forEach(t => {
+      const d = t.map((p, k) => `${k ? "L" : "M"}${px(p.i).toFixed(1)} ${py(p.v).toFixed(1)}`).join(" ");
+      if (t.length > 1) {
+        lineas += `<path d="${d}" fill="none" stroke="#867BB8" stroke-width="2.5"
+                     stroke-linecap="round" stroke-linejoin="round"/>`;
+        // El relleno cierra bajo el TRAMO, no bajo todo el lienzo: por eso
+        // antes un solo punto pintaba un triangulo desde la esquina.
+        const x0 = px(t[0].i).toFixed(1), x1 = px(t[t.length - 1].i).toFixed(1);
+        const base = (mArr + altoUtil).toFixed(1);
+        area += `<path d="${d} L${x1} ${base} L${x0} ${base} Z" fill="url(#cg)"/>`;
+      }
+      t.forEach(p => {
+        const cx = px(p.i).toFixed(1), cy = py(p.v).toFixed(1);
+        const et = (ANIMOS[p.v] || ANIMOS[3]).texto;
+        const fecha = p.fecha.getDate() + " " + MES[p.fecha.getMonth()];
+        puntos += `<circle cx="${cx}" cy="${cy}" r="${t.length === 1 ? 5 : 4}"
+                     fill="${(ANIMOS[p.v] || ANIMOS[3]).color}" stroke="var(--bg-1)" stroke-width="1.5">
+                     <title>${fecha}: ${et} (${p.v}/5)</title></circle>`;
+      });
     });
 
     svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", `Ánimo de los últimos ${DIAS} días: ${conDato.length} registros`);
     svg.innerHTML = `
       <defs>
         <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#D6A6CE" stop-opacity=".45"/>
+          <stop offset="0%" stop-color="#D6A6CE" stop-opacity=".40"/>
           <stop offset="100%" stop-color="#B7B2EA" stop-opacity="0"/>
         </linearGradient>
       </defs>
-      ${path ? `<path d="${path} L${w - pad} ${h - pad} L${pad} ${h - pad} Z" fill="url(#cg)"/>` : ""}
-      ${path ? `<path d="${path}" fill="none" stroke="#867BB8" stroke-width="2.5" stroke-linecap="round"/>` : ""}
-      ${dots}
-    `;
+      ${rejilla}${ejeX}${area}${lineas}${puntos}`;
+
+    /* ---------- resumen en palabras ----------
+       Una grafica sin numeros obliga a estimar a ojo. Esto dice en texto
+       lo que la linea insinua. */
+    const res = $("#chartResumen");
+    if (res) {
+      const vals = conDato.map(d => d.value);
+      const prom = (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1);
+      const mejor = conDato.reduce((a, b) => (b.value > a.value ? b : a));
+      const peor  = conDato.reduce((a, b) => (b.value < a.value ? b : a));
+      const dia = d => d.getDate() + " " + MES[d.getMonth()];
+      const huecos = DIAS - conDato.length;
+      res.innerHTML = `
+        <span><strong>${conDato.length}</strong> de ${DIAS} días registrados</span>
+        <span>Promedio <strong>${prom}</strong>/5</span>
+        <span>Mejor: <strong>${dia(mejor.fecha)}</strong> (${(ANIMOS[mejor.value]||{}).texto})</span>
+        <span>Más bajo: <strong>${dia(peor.fecha)}</strong> (${(ANIMOS[peor.value]||{}).texto})</span>
+        ${huecos ? `<span class="chart-huecos">${huecos} día${huecos > 1 ? "s" : ""} sin registro</span>` : ""}`;
+    }
   }
 
   /* =========================================================
@@ -495,6 +931,36 @@
     });
     state.consentimiento = registro;
     saveState();
+  }
+
+  /* ---------- Nombre y fecha de nacimiento ----------
+     Va DESPUES del consentimiento, no antes: pedir datos de una persona
+     que todavia no ha aceptado que se traten seria recabarlos sin base.
+
+     Se ejecuta en cada arranque, no solo al registrarse. Quien entro con
+     Google nunca paso por el formulario de correo, y quien creo su cuenta
+     antes de que esto existiera tampoco: a los dos se les pregunta aqui,
+     una sola vez. */
+  async function revisarPerfil() {
+    const P = window.AuraPerfil;
+    if (!P || !P.requiere(state)) return;
+
+    const persona = await P.pedir({ nombre: state.name, nacimiento: state.birth });
+    state.name = persona.nombre;
+    state.birth = persona.nacimiento;
+    state.menorDeEdad = persona.menorDeEdad;
+    if (persona.tutorAutoriza) state.tutorAutoriza = persona.registrado;
+    saveState();
+
+    // El perfil de la cuenta tambien: es lo que ve el especialista cuando
+    // acepta la vinculacion.
+    try {
+      await window.AuraAuth?.guardarPerfil({
+        nombre: persona.nombre,
+        nacimiento: persona.nacimiento,
+        menorDeEdad: persona.menorDeEdad
+      });
+    } catch (e) { /* el dato ya quedo en el estado; se reintenta al sincronizar */ }
   }
 
   /** Tarjeta que sustituye a un modulo personal cuando no hay consentimiento. */
@@ -615,6 +1081,7 @@
   }
 
   function renderDiary() {
+    sincronizarAnimo();
     const lock = $("#diaryLockView"), main = $("#diaryMainView");
     const hueco = $("#diarioSinConsent");
     if (!puedeTratarSensibles()) {
@@ -853,6 +1320,11 @@
   function renderAurorIA() {
     const log = $("#chatLog");
     if (!log) return;
+    montarMascota();
+    pintarControlesVoz();
+    // Las voces del sistema cargan tarde; si esta pantalla se abre antes
+    // que Configuración, hay que elegir voz aquí o el chip no funciona.
+    if (window.AuraVoz?.disponible() && !window.AuraVoz.voz) window.AuraVoz.elegirVoz();
     log.innerHTML = "";
     if (!puedeTratarSensibles()) {
       log.innerHTML = tarjetaSinConsentimiento("tus conversaciones");
@@ -867,6 +1339,242 @@
     } else {
       state.auroriaMemory.forEach(m => appendBubble(m.sender, m.text));
     }
+  }
+
+  /* =========================================================
+     La mascota de aurorIA
+     ========================================================= */
+
+  let mascota = null;
+
+  function montarMascota() {
+    const caja = $("#mascotaAurorIA");
+    if (!caja || !window.AuraMascota) return null;
+    if (mascota) return mascota;
+    mascota = window.AuraMascota.crear(caja);
+    return mascota;
+  }
+
+  function pieMascota(txt) {
+    const el = $("#mascotaPie");
+    if (el) el.textContent = txt || "";
+  }
+
+  /* Mientras la persona escribe, la mascota escucha. Es el gesto que
+     hace que se sienta acompanada en vez de vigilada por una imagen
+     fija: no dice nada nuevo, pero responde. */
+  let relojEscucha = null;
+  function mascotaEscucha() {
+    if (!mascota) return;
+    if (mascota.estadoActual === "hablando" || mascota.estadoActual === "pensando") return;
+    mascota.estado("escuchando");
+    clearTimeout(relojEscucha);
+    relojEscucha = setTimeout(() => {
+      if (mascota && mascota.estadoActual === "escuchando") mascota.estado("reposo");
+    }, 2200);
+  }
+
+  /* ---------- decir la respuesta en voz alta ----------
+     Cada palabra que la voz pronuncia mueve la boca una silaba. Si la
+     voz no esta disponible o esta apagada, la mascota igual "habla" un
+     momento: el gesto acompana a la burbuja que acaba de aparecer, y
+     sin el la respuesta cae en el chat sin que nadie la diga. */
+  async function decirEnVoz(texto, opciones) {
+    opciones = opciones || {};
+    const m = mascota;
+    if (m) m.estado("hablando");
+
+    // Cerrar el ciclo de la conversación por voz: en cuanto termina de
+    // hablar, vuelve a escuchar. La pausa corta evita que el micrófono
+    // alcance a captar la cola de su propia voz.
+    const seguir = () => {
+      if (opciones.luegoEscuchar && state.vozAVoz && !escuchando) {
+        setTimeout(escucharYEnviar, 420);
+      }
+    };
+
+    const V = window.AuraVoz;
+    const puede = state.vozActiva && V && V.disponible();
+
+    if (!puede) {
+      if (m) {
+        // Gesto corto, proporcional al largo del texto, con tope.
+        const golpes = Math.min(14, Math.max(4, Math.round(String(texto).length / 28)));
+        for (let i = 0; i < golpes; i++) {
+          setTimeout(() => { if (mascota === m) m.silaba(); }, i * 140);
+        }
+        setTimeout(() => { if (mascota === m && m.estadoActual === "hablando") m.estado("reposo"); },
+                   golpes * 140 + 260);
+      }
+      // Sin lectura en voz alta el ciclo igual continúa: se puede
+      // conversar por voz leyendo las respuestas en pantalla.
+      seguir();
+      return;
+    }
+
+    // La primera vez que habla, se dice de nuevo lo que es. Darle voz y
+    // cara la hace sentir mas persona, y ese es justo el momento en que
+    // el descargo importa mas, no menos.
+    if (!state.avisoVozVisto) {
+      state.avisoVozVisto = true;
+      saveState();
+      pieMascota("Voz sintética — aurorIA no es una persona.");
+    }
+
+    await V.hablar(texto, {
+      alPalabra: () => { if (mascota === m) m.silaba(); },
+      alTerminar: () => {
+        if (mascota === m && m.estadoActual === "hablando") m.estado("reposo");
+        seguir();
+      }
+    });
+  }
+
+  /* =========================================================
+     Voz: encender, apagar y mantener los dos lados de acuerdo
+     ========================================================= */
+
+  /** Enciende la lectura en voz alta. Devuelve false si no se pudo. */
+  function encenderVoz(conSaludo) {
+    const V = window.AuraVoz;
+    if (!V || !V.disponible()) { toast("Este navegador no puede leer en voz alta."); return false; }
+    if (!V.voz) {
+      V.voces().then((lista) => {
+        toast(V.vocesEspanol(lista).length
+          ? "Las voces del sistema apenas están cargando. Vuelve a tocar en un momento."
+          : "No hay voces en español instaladas en este dispositivo.");
+        pintarVoz();
+      });
+      return false;
+    }
+    // Todo esto sin await: el sonido tiene que salir dentro del mismo
+    // gesto del toque o Safari lo bloquea.
+    V.desbloquear();
+    window.AuraTimbre?.despertar();
+    state.vozActiva = true;
+    montarMascota();
+    if (conSaludo) decirEnVoz("Hola, soy aurorIA. Así sueno.");
+    saveState();
+    pintarControlesVoz();
+    return true;
+  }
+
+  function apagarVoz() {
+    state.vozActiva = false;
+    callarMascota();
+    window.AuraTimbre?.cerrarHalo();
+    saveState();
+    pintarControlesVoz();
+  }
+
+  /** Deja chips e interruptores diciendo lo mismo, estén donde estén. */
+  function pintarControlesVoz() {
+    // Ofrecer "conversar por voz" a quien todavia no da su
+    // consentimiento es ofrecerle algo que va a rebotar. Se esconden.
+    const conPermiso = puedeTratarSensibles();
+    const hayVoz = !!window.AuraVoz?.disponible() && conPermiso;
+    const hayMic = !!window.AuraEscucha?.disponible() && conPermiso;
+
+    const chipL = $("#chipLeer");
+    if (chipL) {
+      chipL.hidden = !hayVoz;
+      chipL.setAttribute("aria-pressed", state.vozActiva ? "true" : "false");
+      chipL.querySelector("use")?.setAttribute("href", state.vozActiva ? "#i-volume" : "#i-volume-off");
+      const t = chipL.querySelector("span");
+      if (t) t.textContent = state.vozActiva ? "Leyendo" : "Que me lea";
+    }
+
+    const chipC = $("#chipConversar");
+    if (chipC) {
+      chipC.hidden = !hayMic;
+      chipC.setAttribute("aria-pressed", state.vozAVoz ? "true" : "false");
+      chipC.querySelector("use")?.setAttribute("href", state.vozAVoz ? "#i-mic" : "#i-mic-off");
+      const t = chipC.querySelector("span");
+      if (t) t.textContent = state.vozAVoz ? "Conversando" : "Conversar por voz";
+    }
+
+    const mic = $("#chatMicBtn");
+    if (mic) mic.hidden = !hayMic;
+
+    $("#vozSwitch")?.classList.toggle("on", !!state.vozActiva);
+    $("#microfonoSwitch")?.classList.toggle("on", !!state.vozAVoz);
+    $("#filaMicrofono")?.classList.toggle("hidden", !hayMic);
+    $("#vozControles")?.classList.toggle("hidden", !hayVoz && !hayMic);
+  }
+
+  /* ---------- escuchar ----------
+     Mientras el micrófono está abierto TIENE que notarse: el chip y el
+     botón laten en rojo y lo que se va entendiendo aparece en el campo
+     de texto. Un micrófono abierto sin señal visible no es aceptable en
+     una app que trata datos de salud. */
+  let escuchando = false;
+
+  function pintarEscucha(activo) {
+    escuchando = activo;
+    $("#chipConversar")?.classList.toggle("escuchando", activo);
+    $("#chatMicBtn")?.classList.toggle("escuchando", activo);
+    const inp = $("#chatInput");
+    if (inp) {
+      inp.classList.toggle("dictando", activo);
+      if (activo) inp.placeholder = "Te escucho…";
+      else { inp.placeholder = "Habla con aurorIA sobre lo que sientes..."; inp.classList.remove("dictando"); }
+    }
+    if (mascota) mascota.estado(activo ? "escuchando" : "reposo");
+  }
+
+  /**
+   * Abre el micrófono una vez y devuelve lo que entendió.
+   * Nunca se escucha mientras aurorIA habla: se oiría a sí misma.
+   */
+  async function escucharAlMicrofono() {
+    const E = window.AuraEscucha;
+    if (!E || !E.disponible()) { toast("Este navegador no puede escuchar."); return ""; }
+    if (escuchando) { E.detener(); return ""; }
+
+    callarMascota();   // que se calle antes de abrir el micrófono
+
+    // La primera vez se dice a dónde va el audio. Es lo único de Aura
+    // que sale del aparato sin cifrar, y eso no se entierra en un aviso.
+    if (!state.avisoMicVisto) {
+      state.avisoMicVisto = true;
+      saveState();
+      pieMascota("Tu voz se convierte a texto en un servicio del navegador.");
+    }
+
+    const inp = $("#chatInput");
+    pintarEscucha(true);
+    const r = await E.escuchar({
+      alParcial: (t) => { if (inp) inp.value = t; }
+    });
+    pintarEscucha(false);
+
+    if (!r.texto) {
+      const msg = E.mensaje(r.motivo);
+      if (msg) toast(msg);
+      if (inp) inp.value = "";
+      // Un permiso denegado no se arregla reintentando: se apaga el modo
+      // para no dejar un botón que solo sabe fallar.
+      if (r.motivo === "not-allowed" || r.motivo === "service-not-allowed" || r.motivo === "audio-capture") {
+        state.vozAVoz = false;
+        saveState();
+        pintarControlesVoz();
+      }
+      return "";
+    }
+    if (inp) inp.value = "";
+    return r.texto;
+  }
+
+  /** Escucha y, si entendió algo, lo manda como mensaje. */
+  async function escucharYEnviar() {
+    if (!state.vozAVoz) return;
+    const texto = await escucharAlMicrofono();
+    if (texto) handleAurorIASend(texto);
+  }
+
+  function callarMascota() {
+    window.AuraVoz?.callar();
+    if (mascota && mascota.estadoActual === "hablando") mascota.estado("reposo");
   }
 
   function appendBubble(sender, text) {
@@ -891,6 +1599,7 @@
   }
 
   function setTyping(on) {
+    if (mascota) mascota.estado(on ? "pensando" : "reposo");
     const log = $("#chatLog");
     if (!log) return;
     let el = $("#chatTyping");
@@ -908,6 +1617,18 @@
 
   async function handleAurorIASend(text) {
     if (!text.trim()) return;
+    // Sin consentimiento no se guarda ni una palabra, venga de donde
+    // venga. Antes esto lo cubria renderAurorIA() escondiendo el chat;
+    // al agregar la voz apareció un camino que no pasaba por ahí.
+    if (!puedeTratarSensibles()) {
+      toast("Necesitamos tu consentimiento para guardar tus conversaciones");
+      state.vozAVoz = false;
+      window.AuraEscucha?.cancelar();
+      pintarEscucha(false);
+      pintarControlesVoz();
+      renderAurorIA();
+      return;
+    }
     appendBubble("me", text);
     state.auroriaMemory.push({ sender: "me", text });
     await guardarSeguro();
@@ -918,6 +1639,10 @@
       appendBubble("bot", reply);
       state.auroriaMemory.push({ sender: "bot", text: reply });
       await guardarSeguro();
+      // En crisis la mascota NO habla: el panel de SOS se abre encima y
+      // dos voces al mismo tiempo en ese momento es lo ultimo que hace
+      // falta. La burbuja queda escrita, que es lo que importa.
+      callarMascota();
       $("#sosOverlay")?.classList.add("open");
       runSosBreathe();
       logSos("mencion_en_chat");
@@ -946,7 +1671,9 @@
     state.auroriaMemory.push({ sender: "bot", text: reply });
     await guardarSeguro();
     computeClinicalData();
+    marcarActividad("chat");
     pushMetrics("chat");
+    decirEnVoz(reply, { luegoEscuchar: true });   // no se espera: el chat no debe trabarse tras la voz
 
     // Si contestó el guion local, decir por qué. Una sola vez por sesión:
     // repetirlo en cada mensaje sería peor que el silencio.
@@ -1063,6 +1790,7 @@
       b.addEventListener("click", () => {
         popped++;
         state.bubblesPopped++;
+        marcarActividad("calma");
         const tag = $("#bubbleScoreTag");
         if (tag) tag.textContent = `${popped} reventadas`;
         b.remove();
@@ -1175,6 +1903,7 @@
           idx = (idx + 1) % phases.length;
           if (idx === 0) {
             state.breathingCycles++;
+            marcarActividad("calma");
             saveState();
             computeClinicalData();
           }
@@ -1334,6 +2063,72 @@
     if (hint && !linked) hint.textContent = "";
     const sw = $("#aiConsentSwitch");
     if (sw) sw.classList.toggle("on", !!state.aiConsent);
+    pintarVoz();
+    pintarRecordatorio();
+  }
+
+  /* ---------- el recordatorio diario ----------
+     Solo existe dentro del APK: en el navegador no hay forma de
+     programar un aviso que salga con la app cerrada, así que la fila
+     se esconde en vez de ofrecer algo que no va a pasar. */
+  async function pintarRecordatorio() {
+    const R = window.AuraRecordatorio;
+    const fila = $("#filaRecordatorio");
+    if (!fila) return;
+
+    if (!R || !R.disponible()) { fila.classList.add("hidden"); return; }
+    fila.classList.remove("hidden");
+
+    const r = state.recordatorio || { activo: false, hora: 21, minuto: 0 };
+    $("#recordatorioSwitch")?.classList.toggle("on", !!r.activo);
+    const campo = $("#recordatorioHora");
+    if (campo) {
+      campo.value = String(r.hora).padStart(2, "0") + ":" + String(r.minuto).padStart(2, "0");
+    }
+
+    const est = $("#recordatorioEstado");
+    if (!est) return;
+    if (!r.activo) { est.textContent = ""; return; }
+    const p = await R.permiso();
+    est.textContent = p === "granted"
+      ? "Activo. Puedes apagarlo cuando quieras."
+      : "Falta el permiso de notificaciones del sistema.";
+  }
+
+  /* ---------- el interruptor de la voz ----------
+     Se dice que aparato la esta poniendo. Si el telefono no trae voces
+     en espanol, mas vale decirlo que dejar un interruptor encendido que
+     no hace ruido: la persona pensaria que la app esta rota. */
+  async function pintarVoz() {
+    const sw = $("#vozSwitch");
+    const fila = $("#filaVoz");
+    const estado = $("#vozEstado");
+    const V = window.AuraVoz;
+
+    if (!V || !V.disponible()) {
+      fila?.classList.add("hidden");
+      pintarControlesVoz();
+      return;
+    }
+    fila?.classList.remove("hidden");
+    pintarControlesVoz();
+    if (!estado) return;
+
+    const lista = await V.voces();
+    const es = V.vocesEspanol(lista);
+    if (!es.length) {
+      estado.textContent = "Tu teléfono no tiene voces en español instaladas. " +
+        "Se pueden agregar desde los ajustes del sistema, en Texto a voz.";
+      if (sw) sw.classList.remove("on");
+      return;
+    }
+    // La voz se elige AQUI, al pintar la pantalla, no al tocar el
+    // interruptor. En Safari la autorizacion de sonido solo dura lo que
+    // dura el gesto: si entre el toque y el primer speak() hay un await,
+    // se pierde y el saludo sale mudo. Dejandola lista de antemano, el
+    // toque llega directo a hablar.
+    await V.elegirVoz();
+    estado.textContent = state.vozActiva ? ("Voz: " + (V.voz ? V.voz.name : es[0].name)) : "";
   }
 
   async function linkTherapist() {
@@ -1368,6 +2163,11 @@
     initSensoryKit();
     initCount90();
 
+    // Los controles de voz se pintan de entrada: sin esto, un navegador
+    // sin reconocimiento mostraba el chip de conversar hasta que alguien
+    // abriera aurorIA por primera vez.
+    pintarControlesVoz();
+
     // Router
     $all("[data-screen]").forEach(b => b.addEventListener("click", () => showScreen(b.dataset.screen)));
     const hash = location.hash.replace("#/", "");
@@ -1377,18 +2177,33 @@
     $("#themeSwitch")?.addEventListener("click", toggleTheme);
     $("#topThemeBtn")?.addEventListener("click", toggleTheme);
 
-    // Mood slider
+    /* ---------- El deslizador del animo ----------
+       Antes solo escuchaba "change", que en un input range se dispara al
+       SOLTAR. Mientras arrastrabas no pasaba nada, y la etiqueta nunca se
+       actualizaba porque nadie tocaba #moodLabel: decia "Neutral" escrito
+       en el HTML y ahi se quedaba pasara lo que pasara.
+
+       Ahora "input" mueve cara y texto en vivo, y "change" es el que
+       guarda: asi no se escribe en Firestore en cada pixel del arrastre. */
     const slider = $("#moodRange");
+
+    slider?.addEventListener("input", () => pintarAnimo(Number(slider.value)));
+
     slider?.addEventListener("change", () => {
       if (!puedeTratarSensibles()) { toast("Necesitamos tu consentimiento para guardar esto"); return; }
       const today = todayKey();
+      const v = Number(slider.value);
       const idx = state.moodLogs.findIndex(m => m.date === today);
-      if (idx >= 0) state.moodLogs[idx].value = Number(slider.value);
-      else state.moodLogs.push({ date: today, value: Number(slider.value) });
+      if (idx >= 0) state.moodLogs[idx].value = v;
+      else state.moodLogs.push({ date: today, value: v });
       saveState();
+      pintarAnimo(v);
       drawChart();
       computeClinicalData();
-      toast("Ánimo de hoy registrado");
+      // Registrar el ánimo es lo ÚNICO que enciende una estrella: es el
+      // dato que alimenta la gráfica y el panel del especialista.
+      encenderEstrella();
+      toast(`Registrado: ${ANIMOS[v].texto}`);
     });
 
     // PIN pad
@@ -1411,6 +2226,7 @@
       if ($("#diaryText")) $("#diaryText").value = "";
       renderDiaryEntries();
       computeClinicalData();
+      renderCielo();
       toast("Entrada cifrada y guardada");
     });
 
@@ -1502,10 +2318,23 @@
 
     // Guardar Perfil
     $("#saveProfileBtn")?.addEventListener("click", () => {
-      state.name = $("#settingsName")?.value.trim() || "";
+      const nombre = $("#settingsName")?.value.trim() || "";
+      const nacimiento = $("#settingsBirth")?.value || "";
+
+      // Se valida con la misma funcion que el registro: si aqui se
+      // pudieran borrar, la app volveria a pedirlos en el siguiente
+      // arranque y se veria como un error.
+      const P = window.AuraPerfil;
+      if (P) {
+        const motivo = P.validar(nombre, nacimiento);
+        if (motivo) { toast(motivo); return; }
+      }
+
+      state.name = nombre;
       state.email = $("#settingsEmail")?.value.trim() || "";
       state.phone = $("#settingsPhone")?.value.trim() || "";
-      state.birth = $("#settingsBirth")?.value || "";
+      state.birth = nacimiento;
+      if (P) state.menorDeEdad = P.esMenor(nacimiento);
       saveState();
       renderHome();
       toast("Perfil guardado");
@@ -1615,6 +2444,106 @@
     });
 
     // Consentimiento del modelo en la nube
+    /* ---------- los cuatro accesos a la voz ----------
+       Dos en Configuración y dos en la pantalla de aurorIA. Todos pasan
+       por las mismas funciones para que no puedan desincronizarse. */
+
+    function alternarLectura() {
+      if (state.vozActiva) { apagarVoz(); toast("aurorIA ya no hablará"); }
+      else if (encenderVoz(true)) { toast("aurorIA hablará en voz alta"); }
+      pintarVoz();
+    }
+
+    function alternarConversar() {
+      const E = window.AuraEscucha;
+      if (!E || !E.disponible()) {
+        toast("Este navegador no puede escuchar. Prueba con Chrome o Edge.");
+        return;
+      }
+      if (state.vozAVoz) {
+        state.vozAVoz = false;
+        E.cancelar();
+        pintarEscucha(false);
+        saveState();
+        pintarControlesVoz();
+        toast("Conversación por voz apagada");
+        return;
+      }
+      state.vozAVoz = true;
+      saveState();
+      pintarControlesVoz();
+      // Si no va a leer las respuestas, conversar por voz queda cojo:
+      // hablas y te contesta en silencio. Se enciende sola, sin saludo.
+      if (!state.vozActiva) encenderVoz(false);
+      toast("Habla cuando quieras");
+      escucharYEnviar();
+    }
+
+    /* ---------- recordatorio ---------- */
+    function horaDelCampo() {
+      const v = ($("#recordatorioHora")?.value || "21:00").split(":");
+      const h = Math.max(0, Math.min(23, parseInt(v[0], 10) || 0));
+      const m = Math.max(0, Math.min(59, parseInt(v[1], 10) || 0));
+      return { hora: h, minuto: m };
+    }
+
+    async function guardarRecordatorio(activo) {
+      const R = window.AuraRecordatorio;
+      if (!R || !R.disponible()) return;
+      const t = horaDelCampo();
+
+      if (!activo) {
+        await R.cancelarDiario();
+        state.recordatorio = { activo: false, hora: t.hora, minuto: t.minuto };
+        saveState();
+        pintarRecordatorio();
+        toast("Recordatorio apagado");
+        return;
+      }
+
+      const ok = await R.programarDiario(t.hora, t.minuto);
+      if (!ok) {
+        // Casi siempre es el permiso. Se dice qué pasó en vez de
+        // dejar un interruptor que se prende y no hace nada.
+        toast("Android no dio permiso para notificaciones. Se activa desde los ajustes del sistema.");
+        state.recordatorio = { activo: false, hora: t.hora, minuto: t.minuto };
+        saveState();
+        pintarRecordatorio();
+        return;
+      }
+      state.recordatorio = { activo: true, hora: t.hora, minuto: t.minuto };
+      saveState();
+      pintarRecordatorio();
+      toast("Te avisaré a las " + String(t.hora).padStart(2, "0") + ":" + String(t.minuto).padStart(2, "0"));
+    }
+
+    $("#recordatorioSwitch")?.addEventListener("click", () => {
+      guardarRecordatorio(!(state.recordatorio && state.recordatorio.activo));
+    });
+    // Cambiar la hora con el recordatorio encendido lo reprograma.
+    $("#recordatorioHora")?.addEventListener("change", () => {
+      if (state.recordatorio && state.recordatorio.activo) guardarRecordatorio(true);
+      else { const t = horaDelCampo(); state.recordatorio = { activo: false, hora: t.hora, minuto: t.minuto }; saveState(); }
+    });
+
+    $("#vozSwitch")?.addEventListener("click", alternarLectura);
+    $("#chipLeer")?.addEventListener("click", alternarLectura);
+    $("#microfonoSwitch")?.addEventListener("click", alternarConversar);
+    $("#chipConversar")?.addEventListener("click", alternarConversar);
+
+    /* El micrófono de la barra: dicta UNA vez y deja el texto listo para
+       revisar antes de mandarlo. No enciende el modo conversación. */
+    $("#chatMicBtn")?.addEventListener("click", async () => {
+      if (escuchando) { window.AuraEscucha?.detener(); return; }
+      const texto = await escucharAlMicrofono();
+      const inp = $("#chatInput");
+      if (texto && inp) { inp.value = texto; inp.focus(); }
+    });
+
+    // Mientras escribe, la mascota escucha.
+    $("#chatInput")?.addEventListener("input", mascotaEscucha);
+    $("#chatInput")?.addEventListener("focus", mascotaEscucha);
+
     $("#aiConsentSwitch")?.addEventListener("click", () => {
       state.aiConsent = !state.aiConsent;
       saveState();

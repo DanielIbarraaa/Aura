@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AURA — Widget "¿Cómo te sientes?"
+     Cada cara es su propio ImageView porque cada una necesita su
+     propio toque: un solo bitmap con las cinco no se puede dividir en
+     cinco zonas tocables dentro de un widget. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/animo_raiz"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="12dp"
+    android:background="@drawable/widget_fondo">
+
+    <TextView
+        android:id="@+id/animo_titulo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:layout_marginBottom="8dp"
+        android:textSize="12.5sp"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textColor="@color/aura_texto"
+        android:text="@string/widget_animo_titulo" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal"
+        android:gravity="center">
+
+        <ImageView android:id="@+id/animo_1"
+            android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="match_parent"
+            android:layout_marginStart="2dp" android:layout_marginEnd="2dp"
+            android:adjustViewBounds="true" android:scaleType="fitCenter"
+            android:contentDescription="@string/widget_animo_1" />
+
+        <ImageView android:id="@+id/animo_2"
+            android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="match_parent"
+            android:layout_marginStart="2dp" android:layout_marginEnd="2dp"
+            android:adjustViewBounds="true" android:scaleType="fitCenter"
+            android:contentDescription="@string/widget_animo_2" />
+
+        <ImageView android:id="@+id/animo_3"
+            android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="match_parent"
+            android:layout_marginStart="2dp" android:layout_marginEnd="2dp"
+            android:adjustViewBounds="true" android:scaleType="fitCenter"
+            android:contentDescription="@string/widget_animo_3" />
+
+        <ImageView android:id="@+id/animo_4"
+            android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="match_parent"
+            android:layout_marginStart="2dp" android:layout_marginEnd="2dp"
+            android:adjustViewBounds="true" android:scaleType="fitCenter"
+            android:contentDescription="@string/widget_animo_4" />
+
+        <ImageView android:id="@+id/animo_5"
+            android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="match_parent"
+            android:layout_marginStart="2dp" android:layout_marginEnd="2dp"
+            android:adjustViewBounds="true" android:scaleType="fitCenter"
+            android:contentDescription="@string/widget_animo_5" />
+    </LinearLayout>
+</LinearLayout>

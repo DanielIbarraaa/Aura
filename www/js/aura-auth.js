@@ -17,6 +17,20 @@
   const suscriptores = [];
 
   const FB = () => window.AuraFB;
+
+  /* ---------- nada espera para siempre ----------
+     Una promesa colgada se ve igual que una pantalla trabada: el usuario
+     no sabe si está pensando o si se murió. Pasado el plazo se convierte
+     en un error que SÍ se puede mostrar. */
+  function conPlazo(promesa, ms, queEra) {
+    let reloj;
+    return Promise.race([
+      promesa.finally(() => clearTimeout(reloj)),
+      new Promise((_, rechaza) => {
+        reloj = setTimeout(() => rechaza(new Error("Se agotó el tiempo " + queEra + ".")), ms);
+      })
+    ]);
+  }
   const enCapacitor = () => !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
   const pluginNativo = () => window.Capacitor?.Plugins?.FirebaseAuthentication || null;
 
@@ -34,14 +48,14 @@
       auth = fb.getAuth(app);
       db = fb.getFirestore(app);
 
-      await new Promise((resolve) => {
+      await conPlazo(new Promise((resolve) => {
         const off = fb.onAuthStateChanged(auth, (u) => {
           usuario = u ? perfilDe(u) : null;
           avisar();
           resolve();
           if (off && !listo) { /* la primera resolución basta */ }
         });
-      });
+      }), 12000, "esperando a Firebase");
       listo = true;
       return true;
     } catch (e) {
@@ -109,7 +123,7 @@
 
   /** Crea la cuenta. Si ya había sesión de invitado, la convierte sin
       perder el uid, el diario ni el historial. */
-  async function registrarConCorreo(nombre, email, pass) {
+  async function registrarConCorreo(nombre, email, pass, datos) {
     if (!listo && !(await init())) throw new Error("Firebase no está configurado todavía.");
     const fb = FB();
     const correo = String(email).trim();
@@ -127,7 +141,16 @@
     }
     usuario = perfilDe(user);
     if (nombre) usuario.nombre = nombre;
-    await guardarPerfil();
+
+    // La fecha de nacimiento viaja al perfil en la misma escritura que el
+    // nombre: dos llamadas separadas dejan la cuenta a medio llenar si la
+    // segunda falla.
+    var extra = null;
+    if (datos && datos.nacimiento) {
+      extra = { nacimiento: datos.nacimiento };
+      if (window.AuraPerfil) extra.menorDeEdad = window.AuraPerfil.esMenor(datos.nacimiento);
+    }
+    await guardarPerfil(extra);
     avisar();
     return usuario;
   }
@@ -184,17 +207,24 @@
   /* ---------- Perfil mínimo en Firestore ---------- */
   /* Solo lo necesario para que el usuario "exista". Nada del diario,
      nada del chat: eso no sale del teléfono. */
+  /* El perfil se escribe en Firestore, y Firestore puede quedarse
+     esperando red indefinidamente. Esta escritura NO debe trabar el
+     registro: la cuenta ya existe en Firebase Auth en ese punto, y
+     Firestore guarda la escritura en su cola y la manda sola cuando
+     vuelva la señal. Por eso el plazo resuelve en vez de reventar —
+     pasado el tiempo se sigue adelante y el dato llega después. */
   async function guardarPerfil(extra) {
     if (!listo || !usuario?.uid || !db) return;
     try {
       const fb = FB();
-      await fb.setDoc(fb.doc(db, "users", usuario.uid), Object.assign({
+      await conPlazo(fb.setDoc(fb.doc(db, "users", usuario.uid), Object.assign({
         nombre: usuario.nombre || null,
         email: usuario.email || null,
         anonimo: usuario.anonimo,
         proveedor: usuario.proveedor,
         ultimoAcceso: fb.serverTimestamp()
-      }, extra || {}), { merge: true });
+      }, extra || {}), { merge: true }), 8000, "guardando tu perfil")
+        .catch((e) => { console.warn("[Aura auth] el perfil se mandará luego:", e.message); });
     } catch (e) {
       console.warn("[Aura auth] no se pudo guardar el perfil:", e.message);
     }

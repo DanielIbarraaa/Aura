@@ -15,7 +15,7 @@ import { logger } from "firebase-functions";
 
 /* aurorIA con Claude vive en su propio archivo: guarda la llave de
    Anthropic y por eso no puede correr en el teléfono. */
-export * from "./auroria.js";
+// export * from "./auroria.js";
 
 initializeApp();
 setGlobalOptions({ region: "us-central1", maxInstances: 10 });

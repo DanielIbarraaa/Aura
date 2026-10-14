@@ -12,3 +12,12 @@ export const FIREBASE_CONFIG = {
 
 export const APPCHECK_SITE_KEY = "6Lf9Hq8tAAAAAO6um7gfxHvk2r1YxZizs0os-DCB";
 export const SDK = "12.18.0";
+
+/* Clave publica de Web Push (VAPID). Sin ella el navegador no entrega
+   notificaciones, y el boton de avisos del panel lo dice en vez de
+   fallar callado.
+
+   Se saca de: Firebase Console -> Configuracion del proyecto ->
+   Cloud Messaging -> Certificados push web -> Generar par de claves.
+   Es publica, como el resto de este archivo. */
+export const VAPID_KEY = "BACmzyrpIc587lqf1-fkMntBc5sfzWbjSJA4UYJ-XCYn4lwwCf-1VIksNlHFnB-gQyBD-C4eKywScNYwlhu2EFo";

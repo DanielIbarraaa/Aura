@@ -54,6 +54,11 @@ if [ ! -d node_modules/@capacitor/android ]; then
     @capacitor/app @capacitor/browser @capacitor/preferences \
     @capacitor/splash-screen @capacitor/status-bar @capacitor/haptics
 fi
+# Recordatorios locales: los programa el teléfono, sin servidor.
+if [ ! -d node_modules/@capacitor/local-notifications ]; then
+  azul "Instalando el plugin de recordatorios"
+  npm install --silent @capacitor/local-notifications
+fi
 if [ ! -d node_modules/@capacitor/assets ]; then
   npm install --silent -D @capacitor/assets
 fi
@@ -107,7 +112,8 @@ azul "Generando iconos y splash de Android"
 python3 tools/make-icons.py >/dev/null
 npx capacitor-assets generate --android --iconBackgroundColor '#C9B6D6' \
   --splashBackgroundColor '#EEF0FA' --splashBackgroundColorDark '#1D182E' >/dev/null
-bien "mipmaps y drawables escritos"
+python3 tools/make-notif-icon.py
+bien "mipmaps, drawables e icono de notificación"
 
 # ---------- 5. Sincronizar ----------
 azul "Sincronizando la web con el proyecto nativo"
@@ -143,4 +149,7 @@ else
     echo "    · Sin cable: pásate el .apk por AirDrop o Drive y ábrelo en el teléfono"
     echo "      (te pedirá permitir instalación de orígenes desconocidos)."
   fi
+  echo
+  echo "  Los widgets: mantén presionada la pantalla de inicio → Widgets → Aura."
+  echo "  Hay dos: \"Tu cielo\" y \"Cómo te sientes\"."
 fi

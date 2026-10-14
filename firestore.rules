@@ -47,9 +47,16 @@ service cloud.firestore {
       // documento como almacenamiento gratis e ilimitado a costa tuya.
       allow write: if esUno(uid)
         && datos().keys().hasOnly(['nombre', 'email', 'anonimo', 'proveedor',
-                                   'ultimoAcceso', 'plan', 'planHasta'])
+                                   'ultimoAcceso', 'plan', 'planHasta',
+                                   'nacimiento', 'menorDeEdad'])
         && (!('nombre' in datos()) || datos().nombre == null || datos().nombre.size() <= 80)
         && (!('email'  in datos()) || datos().email  == null || datos().email.size() <= 254)
+        // Fecha de nacimiento: formato exacto AAAA-MM-DD. El regex es el
+        // que impide que este campo se use como texto libre de 1 MiB.
+        && (!('nacimiento' in datos()) || datos().nacimiento == null ||
+            (datos().nacimiento is string &&
+             datos().nacimiento.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')))
+        && (!('menorDeEdad' in datos()) || datos().menorDeEdad is bool)
         // El plan lo escribe el servidor cuando haya suscripción, no el cliente.
         && (!('plan' in datos()) || datos().plan == 'gratis');
 
