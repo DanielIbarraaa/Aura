@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- La paleta de style.css, para que el widget y la app se vean
+         de la misma familia. -->
+    <color name="aura_vidrio">#F6F4FD</color>
+    <color name="aura_borde">#E1DCF6</color>
+    <color name="aura_morado">#867BB8</color>
+    <color name="aura_texto">#342852</color>
+    <color name="aura_texto_tenue">#6B6188</color>
+
+    <string name="widget_cielo_nombre">Aura · Tu cielo</string>
+    <string name="widget_animo_nombre">Aura · Cómo te sientes</string>
+    <string name="widget_cielo_titulo">Tu cielo</string>
+    <string name="widget_animo_titulo">¿Cómo te sientes?</string>
+    <string name="widget_dias">días</string>
+    <string name="widget_cielo_desc">Tu constelación en curso</string>
+    <!-- Las descripciones para lector de pantalla van de peor a mejor
+         sin nombrar emociones clínicas: es un widget en la pantalla de
+         inicio, no un cuestionario. -->
+    <string name="widget_animo_1">Muy mal</string>
+    <string name="widget_animo_2">Mal</string>
+    <string name="widget_animo_3">Más o menos</string>
+    <string name="widget_animo_4">Bien</string>
+    <string name="widget_animo_5">Muy bien</string>
+</resources>

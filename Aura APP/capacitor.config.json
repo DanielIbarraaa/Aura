@@ -1,0 +1,51 @@
+{
+  "appId": "mx.pixelium.aura",
+  "appName": "Aura",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#EEF0FA"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1400,
+      "launchAutoHide": true,
+      "backgroundColor": "#EEF0FA",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "LIGHT",
+      "backgroundColor": "#EEF0FA"
+    },
+    "FirebaseAuthentication": {
+      "skipNativeAuth": true,
+      "providers": [
+        "google.com"
+      ]
+    },
+    "FirebaseAppCheck": {
+      "debug": false
+    }
+  },
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#EEF0FA",
+    "scrollEnabled": true,
+    "preferredContentMode": "mobile",
+    "limitsNavigationsToAppBoundDomains": false,
+    "includePlugins": [
+      "@capacitor-community/speech-recognition",
+      "@capacitor-firebase/app-check",
+      "@capacitor-firebase/authentication",
+      "@capacitor/app",
+      "@capacitor/browser",
+      "@capacitor/haptics",
+      "@capacitor/local-notifications",
+      "@capacitor/preferences",
+      "@capacitor/splash-screen",
+      "@capacitor/status-bar"
+    ]
+  }
+}

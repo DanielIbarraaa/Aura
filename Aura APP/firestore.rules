@@ -1,0 +1,228 @@
+rules_version = '2';
+
+// =========================================================
+// AURA — reglas de Firestore
+// La promesa de la app ("tu terapeuta ve la curva, nunca el texto")
+// se sostiene en dos cosas: que el texto del diario nunca se sube en
+// claro, y en este archivo. Si alguna vez lo relajas, la promesa deja
+// de ser cierta.
+//
+// Principios que sigue todo lo de abajo:
+//   1. Nadie escribe campos que no le tocan (hasOnly en cada write).
+//   2. Nadie se otorga privilegios a sí mismo (verified, therapistUid).
+//   3. Todo documento tiene tope de tamaño: una regla sin límite es
+//      una factura sin límite.
+// =========================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function autenticado() { return request.auth != null; }
+    function esUno(uid)    { return autenticado() && request.auth.uid == uid; }
+
+    function datos()  { return request.resource.data; }
+    function previo() { return resource.data; }
+
+    function terapeutaDe(pid) {
+      return autenticado() &&
+        get(/databases/$(database)/documents/patients/$(pid)).data.therapistUid == request.auth.uid;
+    }
+
+    function soloCambian(campos) {
+      return datos().diff(previo()).affectedKeys().hasOnly(campos);
+    }
+
+    function codigoValido(code, tuid) {
+      return exists(/databases/$(database)/documents/codes/$(code))
+        && get(/databases/$(database)/documents/codes/$(code)).data.therapistUid == tuid
+        && get(/databases/$(database)/documents/codes/$(code)).data.active == true;
+    }
+
+    // ---------- Perfil del usuario de la app ----------
+    // Lo mínimo para que la cuenta exista. Cada quien solo se ve a sí mismo:
+    // ni siquiera su terapeuta entra aquí — él lee /patients y /metrics.
+    match /users/{uid} {
+      allow read: if esUno(uid);
+
+      // Lista blanca de campos: sin esto, cualquiera puede usar su propio
+      // documento como almacenamiento gratis e ilimitado a costa tuya.
+      allow write: if esUno(uid)
+        && datos().keys().hasOnly(['nombre', 'email', 'anonimo', 'proveedor',
+                                   'ultimoAcceso', 'plan', 'planHasta',
+                                   'nacimiento', 'menorDeEdad'])
+        && (!('nombre' in datos()) || datos().nombre == null || datos().nombre.size() <= 80)
+        && (!('email'  in datos()) || datos().email  == null || datos().email.size() <= 254)
+        // Fecha de nacimiento: formato exacto AAAA-MM-DD. El regex es el
+        // que impide que este campo se use como texto libre de 1 MiB.
+        && (!('nacimiento' in datos()) || datos().nacimiento == null ||
+            (datos().nacimiento is string &&
+             datos().nacimiento.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')))
+        && (!('menorDeEdad' in datos()) || datos().menorDeEdad is bool)
+        // El plan lo escribe el servidor cuando haya suscripción, no el cliente.
+        && (!('plan' in datos()) || datos().plan == 'gratis');
+
+      // ---------- El estado de la app, del usuario y de nadie más ----------
+      // Aquí vive lo que antes estaba en localStorage. Ni el terapeuta ni el
+      // Admin SDK de las funciones tocan esta subcolección: es del dueño.
+      // El diario llega ya cifrado desde el teléfono; el servidor solo guarda
+      // bytes que no puede leer.
+      match /privado/{doc} {
+        allow read, write: if esUno(uid);
+      }
+    }
+
+    // ---------- Perfil del especialista ----------
+    match /therapists/{uid} {
+      allow get: if esUno(uid);
+      allow list: if false;
+
+      allow create: if esUno(uid)
+        && datos().verified == false                       // nadie nace verificado
+        && datos().cedula is string
+        && datos().cedula.matches('^[0-9]{7,10}$')
+        && datos().name is string
+        && datos().name.size() >= 4 && datos().name.size() <= 120
+        && datos().keys().hasOnly(['name', 'cedula', 'especialidad', 'institucion',
+                                   'ciudad', 'modalidad', 'whatsapp', 'tarifa',
+                                   'email', 'verified', 'activo', 'createdAt',
+                                   'code', 'fcmTokens', 'cripto']);
+
+      // Puede editar su perfil, pero nunca su verificación ni su cédula:
+      // si la cédula fuera mutable, bastaría verificarse con una real y
+      // cambiarla después.
+      allow update: if esUno(uid)
+        && datos().verified == previo().verified
+        && datos().cedula   == previo().cedula
+        && datos().keys().hasOnly(['name', 'cedula', 'especialidad', 'institucion',
+                                   'ciudad', 'modalidad', 'whatsapp', 'tarifa',
+                                   'email', 'verified', 'activo', 'createdAt',
+                                   'code', 'fcmTokens', 'cripto'])
+        && (!('fcmTokens' in datos()) || datos().fcmTokens.size() <= 10);
+
+      allow delete: if false;
+    }
+
+    // ---------- Índice de códigos de invitación ----------
+    // El paciente necesita resolver AUR-XXXXXX -> terapeuta, así que get()
+    // está abierto a usuarios autenticados. list() no: nadie barre la
+    // colección. La defensa contra adivinar códigos uno por uno es doble:
+    // seis caracteres de un alfabeto de 32 (mil millones de combinaciones)
+    // y App Check, que exige que la petición venga de tu app de verdad.
+    match /codes/{code} {
+      allow get: if autenticado();
+      allow list: if false;
+
+      // create falla si el código ya existe, así una colisión no le roba
+      // el código a otro terapeuta.
+      allow create: if autenticado()
+        && datos().therapistUid == request.auth.uid
+        && datos().active == true
+        && datos().keys().hasOnly(['therapistUid', 'name', 'active', 'createdAt']);
+
+      allow update: if autenticado()
+        && previo().therapistUid == request.auth.uid
+        && datos().therapistUid == previo().therapistUid
+        && soloCambian(['active', 'name']);
+
+      allow delete: if false;
+    }
+
+    // ---------- Vínculo paciente-terapeuta ----------
+    match /patients/{pid} {
+      allow read: if esUno(pid)
+                  || (autenticado() && previo().therapistUid == request.auth.uid);
+
+      // Al crearse, o no hay vínculo, o el vínculo corresponde a un código real.
+      allow create: if esUno(pid)
+        && datos().keys().hasOnly(['therapistUid', 'code', 'alias', 'linkedAt',
+                                   'lastSeen', 'unlinkedAt'])
+        && (!('therapistUid' in datos())
+            || codigoValido(datos().code, datos().therapistUid));
+
+      // El paciente controla su vínculo, pero no puede apuntarse al terapeuta
+      // que se le antoje: el uid del terapeuta es público en /directory, así
+      // que sin esta comprobación cualquiera podría meterse a la lista de
+      // pacientes de un profesional y llenársela de basura.
+      allow update: if (esUno(pid)
+                        && datos().keys().hasOnly(['therapistUid', 'code', 'alias',
+                                                   'linkedAt', 'lastSeen', 'unlinkedAt'])
+                        && (!('therapistUid' in datos())
+                            || codigoValido(datos().code, datos().therapistUid)))
+                    || (autenticado()
+                        && previo().therapistUid == request.auth.uid
+                        && soloCambian(['alias']));
+
+      allow delete: if esUno(pid);
+
+      // ---------- Métricas: números, nunca texto ----------
+      // La lista blanca es la que sostiene la promesa de privacidad: si un
+      // día alguien agrega un campo con texto del diario, esta regla lo tira.
+      match /metrics/{doc} {
+        allow read: if esUno(pid) || terapeutaDe(pid);
+
+        allow write: if esUno(pid)
+          && datos().keys().hasOnly(['moodAvg14', 'moodCurve', 'stabilityLabel',
+                                     'stabilityVariance', 'clinicalTermFreq',
+                                     'clinicalTermTotal', 'breathingCycles',
+                                     'tippUses', 'sensoryUses', 'bubblesPopped',
+                                     'diaryEntryCount', 'sosEvents', 'updatedAt',
+                                     'reason', 'syncedAt'])
+          && (!('moodCurve' in datos()) || datos().moodCurve.size() <= 60)
+          && (!('sosEvents' in datos()) || datos().sosEvents.size() <= 50)
+          && (!('clinicalTermFreq' in datos()) || datos().clinicalTermFreq.keys().size() <= 40);
+      }
+
+      // ---------- Notas de evolución: del terapeuta, privadas ----------
+      // El paciente NO entra aquí, ni siquiera a leer.
+      // ---------- Notas de evolucion: cifradas, sin excepcion ----------
+      // Antes esta regla aceptaba 'texto' en claro. Ya no: el servidor
+      // rechaza cualquier nota que no venga cifrada, asi que aunque el
+      // panel tuviera un bug, no hay forma de que texto clinico legible
+      // llegue a Firestore. Las notas viejas en claro se siguen leyendo
+      // (el panel las migra al abrir la boveda), pero no se pueden crear.
+      //
+      // 20000 caracteres de ciphertext en base64 equivalen a ~14 KB de
+      // texto: holgado para una nota de sesion y acotado para que nadie
+      // use el expediente como almacenamiento gratis.
+      match /notes/{noteId} {
+        allow read, delete: if terapeutaDe(pid);
+        allow create, update: if terapeutaDe(pid)
+          && datos().iv is string && datos().iv.size() <= 32
+          && datos().ct is string && datos().ct.size() <= 20000
+          && datos().keys().hasOnly(['iv', 'ct', 'therapistUid', 'createdAt']);
+      }
+    }
+
+    // ---------- Alertas de SOS ----------
+    match /alerts/{id} {
+      allow create: if autenticado()
+        && datos().patientId == request.auth.uid
+        && datos().therapistUid ==
+           get(/databases/$(database)/documents/patients/$(request.auth.uid)).data.therapistUid
+        && datos().read == false
+        && datos().origen is string
+        && datos().origen.size() <= 40
+        && datos().keys().hasOnly(['patientId', 'therapistUid', 'origen', 'at', 'read', 'readAt']);
+
+      allow get, list: if autenticado() && previo().therapistUid == request.auth.uid;
+
+      allow update: if autenticado()
+        && previo().therapistUid == request.auth.uid
+        && soloCambian(['read', 'readAt']);
+
+      allow delete: if false;
+    }
+
+    // ---------- Directorio público de la app ----------
+    // Lo escribe únicamente la Cloud Function cuando una cédula queda
+    // verificada, y solo lleva los campos que el paciente puede ver.
+    match /directory/{uid} {
+      allow read: if true;
+      allow write: if false;    // solo el Admin SDK, que se salta las reglas
+    }
+
+    // Todo lo demás queda cerrado.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
