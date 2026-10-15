@@ -1,0 +1,45 @@
+{
+  "name": "aura",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Aura — app de acompañamiento y bienestar emocional (PWA + Android vía Capacitor)",
+  "scripts": {
+    "build:firebase": "esbuild src/firebase-bundle.js --bundle --minify --format=iife --global-name=AuraFB --outfile=www/vendor/aura-firebase.js",
+    "serve": "python3 -m http.server 5173 -d www",
+    "sync": "npx cap sync",
+    "android": "bash tools/build-android.sh",
+    "deploy:web": "firebase deploy --only hosting:sitio",
+    "deploy:rules": "firebase deploy --only firestore:rules",
+    "deploy:functions": "firebase deploy --only functions",
+    "emu": "firebase emulators:start",
+    "android:release": "bash tools/build-android.sh release",
+    "abrir": "npx cap open android",
+    "iconos": "python3 tools/make-icons.py && python3 tools/make-mascota.py",
+    "deploy:app": "firebase deploy --only hosting:app",
+    "deploy:todo": "firebase deploy --only hosting,firestore:rules,functions",
+    "demo": "node tools/seed-demo.mjs",
+    "ios": "bash tools/build-ios.sh",
+    "abrir:ios": "npx cap open ios"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.1",
+    "esbuild": "^0.28.2"
+  },
+  "dependencies": {
+    "@capacitor-community/speech-recognition": "^7.0.1",
+    "@capacitor-firebase/app-check": "^8.5.1",
+    "@capacitor-firebase/authentication": "^8.5.1",
+    "@capacitor/android": "^8.5.1",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/browser": "^8.0.4",
+    "@capacitor/core": "^8.5.1",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/ios": "^8.5.1",
+    "@capacitor/local-notifications": "^8.3.1",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.3",
+    "firebase": "^12.18.0"
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "659707329464",
+    "project_id": "aura-2027",
+    "storage_bucket": "aura-2027.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:659707329464:android:909b068ca725e32a3ced4d",
+        "android_client_info": {
+          "package_name": "mx.pixelium.aura"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "659707329464-pl90jgen90vnd0dhchqkeem6csu67qpg.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "mx.pixelium.aura",
+            "certificate_hash": "dffbdccffe6f164397b9b2f9c27713ca89dbeda4"
+          }
+        },
+        {
+          "client_id": "659707329464-5i2guk6dst93onqteeut4p98v16t7gc0.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD_fkeZqDVMjJjRkLA45-z0_-MfwN2G0Go"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "659707329464-5i2guk6dst93onqteeut4p98v16t7gc0.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

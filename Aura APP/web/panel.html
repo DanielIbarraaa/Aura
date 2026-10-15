@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel clínico — Aura</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#6C5CE7">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<link rel="stylesheet" href="assets/css/aura.css">
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js">
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js">
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js">
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.18.0/firebase-app-check.js">
+<link rel="icon" href="assets/img/favicon-32.png" sizes="32x32" type="image/png">
+</head>
+<body>
+
+<header class="barra">
+  <div class="contenedor barra-in" style="max-width:none">
+    <a class="marca" href="index.html"><span class="marca-estrella" aria-hidden="true"></span> Aura</a>
+    <nav>
+      <span class="pastilla p-neutro" id="miCodigo" title="Tu código de invitación">AUR-••••••</span>
+      <span id="miNombre" style="font-size:14px; color:var(--tinta-2);"></span>
+      <button class="btn btn-fantasma btn-sm" id="btnSalir">Salir</button>
+    </nav>
+  </div>
+</header>
+
+<div class="panel">
+
+  <aside class="panel-lista">
+    <h2>Pacientes activos</h2>
+    <div id="listaPacientes"></div>
+    <div id="listaVacia" class="oculto" style="padding:16px 10px; font-size:13.5px; color:var(--tinta-3); line-height:1.55;">
+      Todavía nadie se ha vinculado. Comparte tu código <b class="mono" id="codigoInline">AUR-••••••</b> con un paciente: lo escribe una vez en Ajustes → Mi especialista.
+    </div>
+  </aside>
+
+  <main class="panel-cuerpo" id="cuerpo">
+    <div class="vacio" id="sinSeleccion">
+      <h3>Elige un paciente</h3>
+      <p>Su expediente se actualiza solo, en cuanto registra su ánimo o usa una técnica.</p>
+    </div>
+
+    <div id="expediente" class="oculto">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:20px; flex-wrap:wrap;">
+        <div>
+          <span class="etiqueta">Mini análisis clínico</span>
+          <h1 style="font-size:29px; margin-top:8px;" id="pacNombre">—</h1>
+          <p style="font-size:13.5px; color:var(--tinta-3); margin-top:6px;">
+            Vinculado con <span class="mono" id="pacCodigo">—</span> · última actividad <span id="pacVisto">—</span>
+          </p>
+        </div>
+        <button class="btn btn-secundario btn-sm" id="btnRenombrar">Poner nombre</button>
+      </div>
+
+      <div class="aviso aviso-info" style="margin-top:20px;" id="avisoSos"></div>
+
+      <div class="tiles" id="tiles"></div>
+
+      <div class="grafica-caja">
+        <div class="grafica-cab">
+          <h3>Estado de ánimo diario, del 1 al 5</h3>
+          <div class="rango" role="group" aria-label="Rango de días">
+            <button data-dias="14" aria-pressed="true">14 días</button>
+            <button data-dias="30" aria-pressed="false">30 días</button>
+            <button id="btnTabla" aria-pressed="false" title="Ver los mismos datos como tabla">Tabla</button>
+          </div>
+        </div>
+        <div id="grafica"></div>
+        <div id="tooltip" role="status"></div>
+        <div id="tablaAnimo" class="oculto"></div>
+      </div>
+
+      <div class="bloque-panel">
+        <h3>Términos clínicos verbalizados con aurorIA</h3>
+        <p style="font-size:13.5px; color:var(--tinta-3); max-width:64ch;">Conteo de apariciones, calculado en el teléfono del paciente. El texto de las conversaciones no sale de su dispositivo.</p>
+        <div class="terminos" id="terminos"></div>
+      </div>
+
+      <!-- Red de respaldo: si el push no llego, la alerta sigue aqui hasta
+           que alguien la marque. No se desvanece sola. -->
+      <div id="alertasSinLeer" class="alertas-sin-leer" hidden></div>
+
+      <div class="bloque-panel">
+        <div class="notas-head">
+          <h3>Historial de activaciones del SOS</h3>
+          <button class="btn btn-linea btn-sm" id="btnAvisos" type="button">Activar avisos</button>
+        </div>
+        <p class="avisos-estado" id="avisosEstado"></p>
+        <div class="linea-tiempo" id="sosLista"></div>
+      </div>
+
+      <div class="bloque-panel">
+        <div class="notas-head">
+          <h3>Notas de evolución</h3>
+          <button class="btn btn-linea btn-sm" id="btnExportar" type="button" hidden>Exportar expediente</button>
+        </div>
+        <p style="font-size:13.5px; color:var(--tinta-3); max-width:64ch; margin-bottom:14px;">
+          Privadas y cifradas con tu código. El paciente no las ve, y el servidor tampoco.
+        </p>
+
+        <!-- Crear la boveda: primera vez del especialista -->
+        <div id="notasCrear" class="notas-candado" hidden>
+          <h4>Crea tu código de notas</h4>
+          <p>Tus notas se van a cifrar en tu navegador antes de salir. Elige un código de al menos 6 caracteres; puedes usar una frase.</p>
+          <div class="notas-form">
+            <label class="sr" for="codNuevo">Código nuevo</label>
+            <input type="password" id="codNuevo" placeholder="Tu código" autocomplete="new-password">
+            <label class="sr" for="codNuevo2">Repite el código</label>
+            <input type="password" id="codNuevo2" placeholder="Repítelo" autocomplete="new-password">
+            <button class="btn btn-primario" id="btnCrearBoveda" type="button">Crear</button>
+          </div>
+          <p class="notas-err" id="errCrear"></p>
+        </div>
+
+        <!-- Codigo de recuperacion: obligatorio, no se puede saltar -->
+        <div id="notasRecuperacion" class="notas-candado notas-critico" hidden>
+          <h4>Guarda este código antes de continuar</h4>
+          <p>
+            Es la única forma de recuperar tus notas si olvidas tu código. No lo guardamos
+            en ningún lado. <strong>La NOM-004 te obliga a conservar el expediente cinco años
+            desde el último acto</strong>, así que esto no es opcional: guárdalo donde guardas
+            lo importante.
+          </p>
+          <div class="cod-rec" id="codRecuperacion"></div>
+          <div class="notas-form">
+            <button class="btn btn-linea" id="btnCopiarRec" type="button">Copiar</button>
+            <button class="btn btn-primario" id="btnConfirmarRec" type="button" disabled>Ya lo guardé</button>
+          </div>
+          <label class="notas-check">
+            <input type="checkbox" id="chkGuardeRec">
+            <span>Lo guardé en un lugar seguro y entiendo que sin él, y sin mi código, mis notas no se pueden recuperar.</span>
+          </label>
+        </div>
+
+        <!-- Abrir la boveda en cada sesion -->
+        <div id="notasAbrir" class="notas-candado" hidden>
+          <h4>Tus notas están cifradas</h4>
+          <p>Escribe tu código para verlas y escribir nuevas.</p>
+          <div class="notas-form">
+            <label class="sr" for="codAbrir">Tu código</label>
+            <input type="password" id="codAbrir" placeholder="Tu código" autocomplete="current-password">
+            <button class="btn btn-primario" id="btnAbrirBoveda" type="button">Abrir</button>
+          </div>
+          <p class="notas-err" id="errAbrir"></p>
+          <button class="enlace-sutil" id="btnOlvideCod" type="button">Olvidé mi código</button>
+        </div>
+
+        <!-- Notas, ya abiertas -->
+        <div id="notasContenido" hidden>
+          <form id="formNota" style="display:flex; flex-direction:column; gap:12px; margin-bottom:22px;">
+            <label class="sr" for="notaTexto">Nueva nota de evolución</label>
+            <textarea id="notaTexto" placeholder="Qué se trabajó en sesión, qué se acordó, qué observar la próxima vez…"></textarea>
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+              <button class="btn btn-primario" type="submit">Guardar nota</button>
+              <button class="btn btn-linea btn-sm" id="btnCerrarBoveda" type="button">Cerrar notas</button>
+            </div>
+          </form>
+          <div id="avisoMigracion" class="notas-aviso" hidden></div>
+          <div id="notas"></div>
+        </div>
+      </div>
+
+      <p class="legal" style="margin-top:44px"><strong>Proyecto Universitario de Acompañamiento Emocional.</strong> Estas métricas son un apoyo complementario para la consulta, no un instrumento diagnóstico ni un sistema de monitoreo en tiempo real. Aura no atiende urgencias. En caso de riesgo inmediato o crisis: Línea de la Vida (<span class="mono">800 911 2000</span>), SAPTEL (<span class="mono">55 5259 8121</span>) o Urgencias (<span class="mono">911</span>).</p>
+    </div>
+  </main>
+</div>
+
+<script>
+/* Si el SDK de Firebase no carga (red lenta o caida), avisar en vez de
+   dejar la pantalla muerta sin explicacion. */
+(function () {
+  var avisado = false;
+  function avisar() {
+    if (avisado) return;
+    avisado = true;
+    var d = document.createElement("div");
+    d.setAttribute("role", "alert");
+    d.style.cssText = "position:fixed;left:0;right:0;top:0;z-index:9999;padding:12px 16px;" +
+      "background:#B3261E;color:#fff;font:500 14px/1.45 Montserrat,system-ui,sans-serif;text-align:center";
+    d.textContent = "No se pudo cargar el servicio. Revisa tu conexion y recarga la pagina.";
+    document.body.appendChild(d);
+    document.querySelectorAll("form button[type=submit]").forEach(function (b) { b.disabled = true; });
+  }
+  var malo = /dynamically imported module|Importing a module script failed|error loading dynamically imported/i;
+  addEventListener("error", function (e) { if (e.message && malo.test(e.message)) avisar(); });
+  addEventListener("unhandledrejection", function (e) {
+    var m = String((e.reason && (e.reason.message || e.reason)) || "");
+    if (malo.test(m)) avisar();
+  });
+})();
+</script>
+<script src="assets/js/aura-cripto.js"></script>
+<script type="module" src="assets/js/panel.js"></script>
+</body>
+</html>
