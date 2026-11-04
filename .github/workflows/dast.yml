@@ -1,0 +1,35 @@
+# =========================================================
+# AURA — Análisis dinámico (DAST) con OWASP ZAP
+# Escaneo pasivo "baseline" contra los dos sitios publicados.
+# No ataca ni envía formularios: revisa encabezados, cookies,
+# fugas de información y configuración del servidor.
+# El reporte HTML queda como artefacto descargable.
+# =========================================================
+name: DAST (OWASP ZAP)
+
+on:
+  schedule:
+    - cron: "41 10 * * 1"   # lunes por la mañana
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  zap:
+    name: ZAP baseline — ${{ matrix.sitio }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        sitio:
+          - https://aura-2027.web.app
+          - https://aura-2027-app.web.app
+    steps:
+      - name: Escaneo ZAP baseline
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: ${{ matrix.sitio }}
+          allow_issue_writing: false
+          fail_action: false
+          artifact_name: zap-${{ strategy.job-index }}
