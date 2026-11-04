@@ -1,0 +1,51 @@
+# =========================================================
+# AURA — Análisis estático de seguridad (SAST) con CodeQL
+# Revisa el JavaScript de la app, el panel y las Cloud Functions
+# en busca de XSS, inyección, uso inseguro de APIs, etc.
+# El repo es privado y sin GitHub Advanced Security, así que los
+# resultados no se suben a Code scanning: se guardan como reporte
+# SARIF descargable en la corrida (artefacto "codeql-sarif").
+# =========================================================
+name: CodeQL (SAST)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "17 9 * * 1"   # lunes 03:17 hora de Aguascalientes
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analizar:
+    name: Analizar JavaScript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+          config: |
+            paths-ignore:
+              - node_modules
+              - www/vendor
+              - "Aura APP"
+
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"
+          upload: never
+          output: sarif-results
+
+      - name: Guardar reporte SARIF
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-sarif
+          path: sarif-results
+          retention-days: 30
