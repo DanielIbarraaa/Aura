@@ -27,7 +27,7 @@ jobs:
           - https://aura-2027-app.web.app
     steps:
       - name: Escaneo ZAP baseline
-        uses: zaproxy/action-baseline@v0.14.0
+        uses: zaproxy/action-baseline@v0.15.0
         with:
           target: ${{ matrix.sitio }}
           allow_issue_writing: false
