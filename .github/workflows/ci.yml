@@ -64,7 +64,7 @@ jobs:
         run: node pruebas/pruebas-escucha-ios.mjs
 
       - name: Publicar la app construida
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: aura-www
           path: www/
@@ -130,7 +130,7 @@ jobs:
           ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Publicar APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: aura-debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
@@ -160,7 +160,7 @@ jobs:
           npm audit --omit=dev || true
 
       - name: Guardar reportes
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: reportes-sca
           path: audit-*.json
