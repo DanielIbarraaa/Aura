@@ -1,0 +1,167 @@
+# =========================================================
+# AURA — Integración continua
+# Se dispara en cada push y pull request a main, y a mano desde
+# la pestaña Actions (workflow_dispatch).
+#
+# Cuatro trabajos:
+#   1. app-web     construye el bundle de Firebase, valida sintaxis
+#                  y JSON, y corre las pruebas automatizadas.
+#   2. functions   instala y valida las Cloud Functions.
+#   3. android     compila el APK de depuración con Capacitor y
+#                  Gradle, y lo deja como artefacto descargable.
+#   4. dependencias  análisis de composición (SCA) con npm audit;
+#                  reporta, no bloquea (ver documento de avance).
+# =========================================================
+name: CI Aura
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app-web:
+    name: App del paciente y panel web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci --no-audit --no-fund
+
+      - name: Construir bundle de Firebase (esbuild)
+        run: npm run build:firebase
+
+      - name: Validar sintaxis de JavaScript
+        run: |
+          set -e
+          for f in www/app.js www/sw.js www/js/*.js web/assets/js/*.js web/firebase-messaging-sw.js; do
+            node --check "$f"
+            echo "ok  $f"
+          done
+
+      - name: Validar archivos JSON de configuración
+        run: |
+          for f in package.json firebase.json capacitor.config.json firestore.indexes.json www/manifest.json; do
+            node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))" && echo "ok  $f"
+          done
+
+      - name: Pruebas automatizadas (micrófono iOS / Android / web)
+        run: node pruebas/pruebas-escucha-ios.mjs
+
+      - name: Publicar la app construida
+        uses: actions/upload-artifact@v4
+        with:
+          name: aura-www
+          path: www/
+          retention-days: 7
+
+  functions:
+    name: Cloud Functions
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: functions
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci --no-audit --no-fund
+
+      - name: Validar sintaxis
+        run: |
+          node --check index.js
+          node --check auroria.js
+
+      - name: Cargar el módulo (detecta imports rotos)
+        run: node -e "import('./index.js').then(() => console.log('index.js carga correctamente'))"
+
+  android:
+    name: APK de Android
+    needs: app-web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Instalar dependencias y construir bundle
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build:firebase
+
+      - name: Sincronizar Capacitor con Android
+        run: npx cap sync android
+
+      - name: Compilar APK de depuración
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Publicar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: aura-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          retention-days: 14
+
+  dependencias:
+    name: Análisis de dependencias (SCA)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: npm audit — app
+        continue-on-error: true
+        run: |
+          npm audit --omit=dev --json > audit-app.json || true
+          npm audit --omit=dev || true
+
+      - name: npm audit — functions
+        continue-on-error: true
+        working-directory: functions
+        run: |
+          npm audit --omit=dev --json > ../audit-functions.json || true
+          npm audit --omit=dev || true
+
+      - name: Guardar reportes
+        uses: actions/upload-artifact@v4
+        with:
+          name: reportes-sca
+          path: audit-*.json
+          retention-days: 30
