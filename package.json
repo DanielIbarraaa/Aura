@@ -23,7 +23,7 @@
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
-    "@capacitor/cli": "^8.5.1",
+    "@capacitor/cli": "^8.6.0",
     "esbuild": "^0.28.2"
   },
   "dependencies": {
